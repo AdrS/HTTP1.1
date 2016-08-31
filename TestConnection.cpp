@@ -72,8 +72,17 @@ void test_read_buf() {
 	}
 }
 
+void test_readLine() {
+	char buf[1024];
+	Connection c("localhost", 1234);
+	for(int i = 0; i < 4; ++i) {
+		size_t l = c.readLine(buf, 32);
+		cout << "read " << l << " characters \"" << buf << "\"" << endl;
+	}
+}
+
 int main() {
 	cout << "Starting connection tests..." << endl;
-	test_read_buf();
+	test_readLine();
 	return 0;
 }

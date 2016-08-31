@@ -132,7 +132,21 @@ size_t Connection::read(char *buf, size_t n) {
 }
 
 size_t Connection::readLine(char *buf, size_t MAX_LINE) {
-	return 0;
+	size_t len = 0;
+	char c;
+	while(len < MAX_LINE - 1) {
+		try {
+			c = readChar();
+		} catch(NoData &e) {
+			break;
+		}
+		if(c == '\0') break;
+		*buf++ = c;
+		++len;
+		if(c == '\n') break;
+	}
+	*buf = '\0';
+	return len;
 }
 
 bool Connection::dataLeft() {

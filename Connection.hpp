@@ -46,7 +46,8 @@ public:
 	size_t read(char *buf, size_t n);
 	//returns true if internal read buffer still has data
 	bool dataLeft();
-	//reads upto and including the next '\n' from the connection
+	//reads upto MAX_LINE - 1 bytes from connection until a '\n' or '\0' is read
+	//copies newline character and adds null terminator
 	size_t readLine(char *buf, size_t MAX_LINE);
 	void sendChar(char c);
 	size_t send(const char *buf, size_t n);
