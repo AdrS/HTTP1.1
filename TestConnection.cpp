@@ -44,9 +44,36 @@ void test_Connection_from_host_and_port() {
 	cout << "Pass!!!" << endl;
 }
 
+void test_readChar() {
+	cout << "Testing Connection::readChar() ..." << endl;
+	Connection c("localhost", 1234);
+	for(size_t i = 0; i < BUF_SIZE + 1; ++i) {
+		cout << c.readChar() << endl;
+	}
+}
+
+void test_read_buf() {
+	cout << "Testing Connection::read(buf, n) ..." << endl;
+	char buf[3*BUF_SIZE];
+	Connection c("localhost", 1234);
+	for(size_t i = 0; i < 10; ++i) {
+		cout << "Reading " << i << "..." << endl;
+		size_t r = c.read(buf, i);
+		buf[r] = '\0';
+		cout << "\"" <<  buf << "\"" << endl;
+		cout << "Read " << r << endl;
+	}
+	for(int i = 0; i < 3; ++i) {
+		cout << "Reading ..." << endl;
+		size_t r = c.read(buf, 3*BUF_SIZE - 1);
+		buf[r] = '\0';
+		cout << "\"" <<  buf << "\"" << endl;
+		cout << "Read " << r << endl;
+	}
+}
+
 int main() {
 	cout << "Starting connection tests..." << endl;
-	test_Connection_from_fd();
-	test_Connection_from_host_and_port();
+	test_read_buf();
 	return 0;
 }
