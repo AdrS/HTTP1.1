@@ -4,7 +4,6 @@
 #include <iostream>
 
 #include <exception>
-#include <string>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
@@ -39,21 +38,20 @@ class Connection {
 	const Connection& operator=(const Connection&);
 public:
 	//
-	Connection(const std::string& host, int port);
+	Connection(const char* host, int port);
 	//takes the file descriptor of the existing socket to wrap
 	Connection(int fd);
 	~Connection();
 	char readChar();
 	size_t read(char *buf, size_t n);
-	std::string read(size_t n);
 	//returns true if internal read buffer still has data
 	bool dataLeft();
 	//reads upto and including the next '\n' from the connection
-	std::string readLine();
+	size_t readLine(char *buf, size_t MAX_LINE);
 	void sendChar(char c);
 	size_t send(const char *buf, size_t n);
 	//writes line to connection. Unless addNewline is false, a newline is appended
-	void sendLine(const std::string& line, bool addNewline = true);
+	void sendLine(const char* line, bool addNewline = true);
 	//flushes the send buffer
 	void flush();
 	//closes the underlying connection

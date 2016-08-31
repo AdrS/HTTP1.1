@@ -1,9 +1,6 @@
 #include "Connection.hpp"
 
-//using std::string;
-using namespace std;
-
-Connection::Connection(const string& host, int port) : fd(-1), rsize(0),
+Connection::Connection(const char* host, int port) : fd(-1), rsize(0),
 								rpos(readBuf), wsize(0), wpos(writeBuf) {
 	//do domain name lookup
 	addrinfo hints;
@@ -14,7 +11,7 @@ Connection::Connection(const string& host, int port) : fd(-1), rsize(0),
 	hints.ai_socktype = SOCK_STREAM;//Want TCP
 	//all other options are set to default (because of the memset)
 
-	if(getaddrinfo(host.c_str(), nullptr, &hints, &res)) {
+	if(getaddrinfo(host, nullptr, &hints, &res)) {
 		//TODO: add more details to exception, see gai_strerror()
 		throw NameResolutionError();
 	}
@@ -134,18 +131,8 @@ size_t Connection::read(char *buf, size_t n) {
 	return (cur - buf);
 }
 
-string Connection::read(size_t n) {
-	/*
-	string s;
-	s.reserve(n);
-	while(n > 0) {
-	}
-	*/
-	return "";
-}
-
-string Connection::readLine() {
-	return "";
+size_t Connection::readLine(char *buf, size_t MAX_LINE) {
+	return 0;
 }
 
 bool Connection::dataLeft() {
@@ -159,7 +146,7 @@ size_t Connection::send(const char *buf, size_t n) {
 	return 0;
 }
 
-void Connection::sendLine(const string& line, bool addNewline) {
+void Connection::sendLine(const char* line, bool addNewline) {
 }
 
 //clear out send buffer
