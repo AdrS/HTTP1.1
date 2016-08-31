@@ -27,10 +27,10 @@ class Connection {
 	int fd;
 	char readBuf[BUF_SIZE];
 	ssize_t rsize;	//amount of unprocessed data in buffer
-	char *rpos;	//position in read buffer
+	char *rpos;		//position in read buffer
 	char writeBuf[BUF_SIZE];
-	ssize_t wsize;
-	char *wpos;
+	size_t wleft;	//space left at end of buffer
+	char *wpos;		//location to append data to
 	//TODO: add support for timeouts
 
 	//Do not want to have to deal with these yet
@@ -50,6 +50,8 @@ public:
 	//copies newline character and adds null terminator
 	size_t readLine(char *buf, size_t MAX_LINE);
 	void sendChar(char c);
+	//send upto the first n characters of buf and return number of characters
+	//successfully sent
 	size_t send(const char *buf, size_t n);
 	//writes line to connection. Unless addNewline is false, a newline is appended
 	void sendLine(const char* line, bool addNewline = true);

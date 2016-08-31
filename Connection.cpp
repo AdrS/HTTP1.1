@@ -1,7 +1,7 @@
 #include "Connection.hpp"
 
 Connection::Connection(const char* host, int port) : fd(-1), rsize(0),
-								rpos(readBuf), wsize(0), wpos(writeBuf) {
+								rpos(readBuf), wleft(BUF_SIZE), wpos(writeBuf) {
 	//do domain name lookup
 	addrinfo hints;
 	addrinfo *res, *rp;
@@ -41,7 +41,7 @@ Connection::Connection(const char* host, int port) : fd(-1), rsize(0),
 	}
 }
 
-Connection::Connection(int fd) : fd(fd), rsize(0), rpos(readBuf), wsize(0),
+Connection::Connection(int fd) : fd(fd), rsize(0), rpos(readBuf), wleft(BUF_SIZE),
 															wpos(writeBuf) {
 	//verify that file descriptor is for a socket
 	struct stat statbuf;
@@ -136,7 +136,8 @@ size_t Connection::readLine(char *buf, size_t MAX_LINE) {
 	char c;
 	while(len < MAX_LINE - 1) {
 		try {
-			c = readChar();
+			//TODO: I do not like this, make readChar act like getchar
+			c = readChar(); 
 		} catch(NoData &e) {
 			break;
 		}
@@ -154,23 +155,63 @@ bool Connection::dataLeft() {
 }
 
 void Connection::sendChar(char c) {
+	//if no space in buffer, then flush
+	if(wleft == 0) flush();
+	*wpos++ = c;
+	--wleft;
 }
 
 size_t Connection::send(const char *buf, size_t n) {
-	return 0;
+	size_t total_len = n;
+	//if buffer has enough space for all the data
+	if(n <= wleft) {
+		memcpy(wpos, buf, n);
+		wpos += n;
+		wleft -= n;
+		//TODO: should I check if buffer is full, so I can flush?
+		return n;
+	}
+
+	//fill up reminder of internal buffer and send it off
+	memcpy(wpos, buf, wleft);
+	buf += wleft;
+	n -= wleft;
+	wpos += wleft;
+	wleft = 0;
+	flush();
+
+	//skip copying to internal buffer while buf has >= BUF_SIZE data left
+	while(n >= BUF_SIZE) {
+		ssize_t sent = ::send(fd, buf, BUF_SIZE, 0);
+		if(sent < 0) throw WriteError();
+		buf += sent;
+		n -= sent;
+	}
+
+	//less than BUF_SIZE bytes of data left, so store in internal buffer for now
+	memcpy(writeBuf, buf, n);
+	wpos = writeBuf + n;
+	wleft -= n;
+	return total_len;
 }
 
 void Connection::sendLine(const char* line, bool addNewline) {
+	send(line, strlen(line));
+	if(addNewline) {
+		sendChar('\n');
+	}
 }
 
 //clear out send buffer
 void Connection::flush() {
-	while(wsize > 0) {
-		ssize_t sent = ::send(fd, wpos, wsize, 0);
+	char *cur = writeBuf;
+	while(cur != wpos) {
+		ssize_t sent = ::send(fd, cur, wpos - cur, 0);
 		if(sent < 0) throw WriteError();
-		wsize -= sent;
-		wpos += sent;
+		cur += sent;
 	}
+	wpos = writeBuf;
+	wleft = BUF_SIZE;
 }
 
 void Connection::close() {

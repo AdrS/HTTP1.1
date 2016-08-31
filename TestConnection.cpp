@@ -1,8 +1,9 @@
 #include <iostream>
+#include <string>
 #include <cassert>
 #include "Connection.hpp"
 
-using std::endl; using std::cout;
+using std::endl; using std::cout; using std::cin; using std::string;
 
 void test_Connection_from_fd() {
 	cout << "Testing Connection(int fd) ..." << endl;
@@ -81,8 +82,28 @@ void test_readLine() {
 	}
 }
 
+void test_send_char() {
+	Connection c("localhost", 1234);
+	//NOTE: I changed BUF_SIZE to be small to make testing easier
+	for(int i = 0; i < 20; ++i) {
+		c.sendChar('a');
+	}
+	c.sendChar('\n');
+}
+
+void test_sendLine() {
+	Connection c("localhost", 1234);
+	string input;
+	while(true) {
+		cin >> input;
+		if(input == "quit") break;
+		c.sendLine(input.c_str());
+	}
+}
+
 int main() {
 	cout << "Starting connection tests..." << endl;
-	test_readLine();
+	test_send_char();
+	test_sendLine();
 	return 0;
 }
