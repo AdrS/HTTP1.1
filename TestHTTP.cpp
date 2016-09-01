@@ -3,6 +3,23 @@
 #include "HTTP.hpp"
 
 using namespace std;
+
+void test_normalizeLineEnding() {
+	char buf[1024];
+	strcpy(buf, "\n");
+	assert(normalizeLineEnding(buf, 1) == 1);
+	assert(strcmp(buf, "\n") == 0);
+	strcpy(buf, "\r\n");
+	assert(normalizeLineEnding(buf, 2) == 1);
+	assert(strcmp(buf, "\n") == 0);
+	strcpy(buf, "123456789\r\n");
+	assert(normalizeLineEnding(buf, 11) == 10);
+	assert(strcmp(buf, "123456789\n") == 0);
+	strcpy(buf, "123456789\n");
+	assert(normalizeLineEnding(buf, 10) == 10);
+	assert(strcmp(buf, "123456789\n") == 0);
+}
+
 void test_tchar() {
 	cout << "testing tchar ..." << endl;
 
@@ -50,6 +67,7 @@ void test_validHeaderValue() {
 }
 int main() {
 	cout << "Starting HTTP tests ..." << endl;
+	test_normalizeLineEnding();
 	test_tchar();
 	test_isToken();
 	test_validHeaderValue();
