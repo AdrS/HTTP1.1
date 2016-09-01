@@ -1,5 +1,7 @@
 #include "HTTP.hpp"
 
+using std::string; using std::pair; using std::make_pair;
+
 //NOTE: this assumes line end in '\n' and might fail if this is not the case
 size_t normalizeLineEnding(char *line, size_t len) {
 	if(len > 1 && line[len - 2] == '\r') {
@@ -58,5 +60,63 @@ HeaderMap parseHeaders(Connection& c, char *buf, size_t BUF_SIZE) {
 	
 	//while there are still headers
 	while(true) {
+		size_t len = c.readLine(buf, BUF_SIZE);
+		//check that an actual line was read
+		if(len == 0 || buf[len - 1] != '\n') throw HTTPError(400);
+
+		len = normalizeLineEnding(buf, len);
+		//empty line signals end of headers
+		if(strcmp(buf, "\n") == 0) break;
+
+		//header-field   = field-name ":" OWS field-value OWS
+		//OWS = *(SP / HT)
+		//find ':' which seperates key and value
+		///////////PARSE HEADER KEY/////////////////
+		char *pos = buf;
+		while(*pos != ':' && *pos != '\n') ++pos;
+
+		//check that there actually is a seperator
+		if(*pos == '\n') throw HTTPError(400);
+		*pos++ = '\0';
+		if(!validHeaderKey(buf)) throw HTTPError(400);
+
+		//Header keys are case insensitive (values may or may not be)
+		//Normalize header keys to lowercase
+		//TODO: lots of broken software does case sensitive comparisons
+		//	and experts word to be capitalized
+		//TODO: write a capitalize function
+		for(char *i = buf; *i; ++i) *i = tolower(*i);
+
+		string key(buf);
+
+		///////////PARSE HEADER VALUE///////////////
+		//skip over whitespace
+		while(*pos == ' ' || *pos == '\t') ++pos;
+
+		//store last non whitespace for trailing OWS removal
+		char *lastNonWS = pos, *hf = pos;
+		while(*pos != '\n') {
+			if(*pos != ' ' && *pos != '\t') lastNonWS = pos;
+			++pos;
+		}
+		lastNonWS[1] = '\0';
+		if(!validHeaderValue(hf)) throw HTTPError(400);
+
+		string value(hf);
+
+		///////////HANDLE COMBINING OF HEADERS/////
+		auto res = hm.insert(make_pair(key, value));
+		//if header key already exists, then combine values
+		if(!res.second) {
+			auto it = res.first;
+			//if cookie header, use ';' as seperator
+			if(it->first == "set-cookie" || it->first == "cookie") {
+				it->second.append(1,';');
+			} else {
+				it->second.append(1,',');
+			}
+			it->second.append(value);
+		}
 	}
+	return hm;
 }

@@ -1,13 +1,13 @@
 CXX = g++
 CXXFLAGS = -Wall -Werror -pedantic -std=c++11 -g
 
-TestHTTP: TestHTTP.o HTTP.o
-	$(CXX) $(CXXFLAGS) TestHTTP.o HTTP.o -o TestHTTP
+TestHTTP: TestHTTP.o HTTP.o Connection.o
+	$(CXX) $(CXXFLAGS) TestHTTP.o HTTP.o Connection.o -o TestHTTP
 
 TestHTTP.o: TestHTTP.cpp HTTP.hpp
 	$(CXX) $(CXXFLAGS) -c TestHTTP.cpp
 
-HTTP.o: HTTP.cpp HTTP.hpp
+HTTP.o: HTTP.cpp HTTP.hpp Connection.hpp
 	$(CXX) $(CXXFLAGS) -c HTTP.cpp
 
 TestURL: TestURL.o URL.o
@@ -34,4 +34,4 @@ test: TestConnection TestURL TestHTTP
 	./TestConnection
 
 clean:
-	rm -rf *.o TestConnection TestURL
+	rm -rf *.o TestConnection TestURL TestHTTP

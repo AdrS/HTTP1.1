@@ -1,10 +1,12 @@
 #ifndef HTTP_H
 #define HTTP_H
 
+#include <iostream>
 #include <exception>
 #include <cctype>
 #include <string>
 #include <map>
+#include <utility>
 #include "Connection.hpp"
 
 //TODO: most of this could be made private, but is public for now to. Make sure to move
@@ -23,9 +25,14 @@ bool validHeaderKey(const char *k);
 //NOTE: will not accept folded header values (which are obsolete)
 bool validHeaderValue(const char *v);
 
+class HTTPError : std::exception {
+public:
+	HTTPError(const int status_code) : status_code(status_code) {}
+	const int status_code;
+};
+
 class InvalidHeaderKey : std::exception {};
 class InvalidHeaderValue : std::exception {};
-class HeadersTooLong : std::exception {};
 
 typedef std::map<std::string, std::string> HeaderMap;
 

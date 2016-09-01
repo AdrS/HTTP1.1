@@ -65,11 +65,31 @@ void test_validHeaderValue() {
 	assert(!validHeaderValue("as \007df"));
 	cout << "PASS!!!" << endl;
 }
+
+void test_parseHeaders() {
+	const size_t BUF_SIZE = 100;
+	char buf[BUF_SIZE];
+
+	while(true) {
+		Connection c("localhost", 1234);
+		try {
+			HeaderMap hm = parseHeaders(c, buf, BUF_SIZE);
+			cout << "Headers:" << endl;
+			for(auto&& i : hm) {
+				cout << i.first << ": " << i.second << endl;
+			}
+		} catch(...) {
+			cout << "Error ... " << endl;
+		}
+	}
+}
+
 int main() {
 	cout << "Starting HTTP tests ..." << endl;
 	test_normalizeLineEnding();
 	test_tchar();
 	test_isToken();
 	test_validHeaderValue();
+//	test_parseHeaders();
 	return 0;
 }
