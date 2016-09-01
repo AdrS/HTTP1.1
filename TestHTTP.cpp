@@ -84,6 +84,36 @@ void test_parseHeaders() {
 	}
 }
 
+void test_parseVersion() {
+	char buf[32];
+	int major, minor;
+	strcpy(buf, "HTTP/0.9");
+	parseVersion(buf, major, minor);
+	assert(major == 0 && minor == 9);
+
+	strcpy(buf, "HTTP/1.1");
+	parseVersion(buf, major, minor);
+	assert(major == 1 && minor == 1);
+
+	strcpy(buf, "HTTP/0.a");
+	try {
+		parseVersion(buf, major, minor);
+		assert(false);
+	} catch(HTTPError &e) {}
+
+	strcpy(buf, "HttP/1.1");
+	try {
+		parseVersion(buf, major, minor);
+		assert(false);
+	} catch(HTTPError &e) {}
+
+	strcpy(buf, "H.1");
+	try {
+		parseVersion(buf, major, minor);
+		assert(false);
+	} catch(HTTPError &e) {}
+}
+
 int main() {
 	cout << "Starting HTTP tests ..." << endl;
 	test_normalizeLineEnding();
@@ -91,5 +121,6 @@ int main() {
 	test_isToken();
 	test_validHeaderValue();
 //	test_parseHeaders();
+	test_parseVersion();
 	return 0;
 }

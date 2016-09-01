@@ -41,6 +41,9 @@ typedef std::map<std::string, std::string> HeaderMap;
 //this takes a pointer to the buffer to reuse so memory is conserved
 HeaderMap parseHeaders(Connection& c, char *buf, size_t BUF_SIZE);
 
+//parsers http version string ie; HTTP/x.x
+void parseVersion(char *vs, int& major, int& minor);
+
 class Reply {
 	int status;
 	//headers

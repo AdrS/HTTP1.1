@@ -120,3 +120,16 @@ HeaderMap parseHeaders(Connection& c, char *buf, size_t BUF_SIZE) {
 	}
 	return hm;
 }
+
+//HTTP-name = %x48.54.54.50 ; HTTP
+//HTTP-version = HTTP-name "/" DIGIT "." DIGIT
+//parsers http version string ie; "HTTP/x.x", raises exception if invalid
+void parseVersion(char *vs, int& major, int& minor) {
+	size_t l = strlen(vs);
+	if(l != 8) throw HTTPError(400);
+	major = vs[5] - '0';
+	minor = vs[7] - '0';
+	if(major > 9 || minor > 9) throw HTTPError(400);
+	vs[5] = vs[7] = 'x';
+	if(strcmp(vs, "HTTP/x.x")) throw HTTPError(400);
+}
