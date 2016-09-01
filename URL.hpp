@@ -4,6 +4,7 @@
 #include <exception>
 #include <cctype>
 #include <cstddef>
+#include <cassert>
 
 bool unreserved(char c);
 bool subDelim(char c);
@@ -24,5 +25,13 @@ size_t percentDecode(char *str);
 //Note: Because unreserved characters do not include '\0' this function is able
 //to preserve null termination
 size_t percentDecodeUnreserved(char *str);
+
+//percent encodes all characters except unreserved ones and '/', length of new string
+// (not including null terminator) is returned.
+//NOTE: the reason there are two len parameters is to remind the caller that
+//  it is required that len(out) >= 3*len(in) + 1, so that there is enough
+//	space in the event that all characters must be percent encoded. The extra
+//	byte is for null termination and output can be treated as normal char*
+size_t percentEncode(const char *in, char *out, size_t ilen, size_t olen);
 
 #endif

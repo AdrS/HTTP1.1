@@ -1,8 +1,5 @@
 #include "URL.hpp"
-
-#include <iostream>
-
-using namespace std;
+#include <cstdint>
 
 //unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~"
 bool unreserved(char c) {
@@ -82,6 +79,31 @@ size_t percentDecodeUnreserved(char *str) {
 	*outPos = '\0';
 	//return new str length
 	return outPos - str;
+}
+
+static char nib2hex(uint8_t nib) {
+	return nib < 10 ? nib + '0' : nib - 10 + 'A';
+}
+
+size_t percentEncode(const char *in, char *out, size_t ilen, size_t olen) {
+	//TODO: still not sure which characters to exclude from percent encoding
+	//	could add safe chars option like python urllib.quote
+	//	ex: urlib.quote treats '/' as safe by default, so I will too
+	assert(olen >= 3*ilen + 1);
+	char *opos = out;
+	for(size_t i = 0; i < ilen; ++i) {
+		//do not percent encode unreserved characters
+		if(unreserved(in[i]) || in[i] == '/') {
+			*opos++ = in[i];
+		} else {
+			*opos++ = '%';
+			*opos++ = nib2hex((uint8_t)in[i] >> 4);
+			*opos++ = nib2hex((uint8_t)in[i] & 15);
+		}
+	}
+	//null terminate so printing is easy
+	*opos = '\0';
+	return opos - out;
 }
 
 /**********************************************************************
