@@ -133,3 +133,72 @@ void parseVersion(char *vs, int& major, int& minor) {
 	vs[5] = vs[7] = 'x';
 	if(strcmp(vs, "HTTP/x.x")) throw HTTPError(400);
 }
+
+Reply::Reply(int status) : status(status), body(nullptr), length(0) {
+	assert(status >= 100 && status <= 599);
+}
+
+//move construtor
+Reply::Reply(Reply&& r) {
+	status = r.status;
+	headers = r.headers;
+	body = r.body;
+	r.body = nullptr;
+	length = r.length;
+}
+
+Client::Client(const std::string& host, int port) : host(host),
+		port(port), con(host.c_str(), port) {
+	//Host is required for all HTTP/1.1 requests so lets add it
+	setHeader("host", host, false);
+}
+
+void Client::disconnect() {
+	con.close();
+}
+
+void Client::reconnect() {
+	con.connect(host.c_str(), port);
+}
+
+void Client::reconnect(const std::string& host, int port) {
+	this->host = host;
+	this->port = port;
+	//new host => must change header
+	setHeader("host", this->host, false);
+	con.connect(this->host.c_str(), port);
+}
+
+//return true only if header already present
+//if key is Cookie or Set-Cookie, ';' is used as delimiter. Otherwise ',' is used.
+bool Client::setHeader(const std::string& key, const std::string& value, bool append) {
+	return false;
+}
+
+//If removes header and return true (if header present).
+bool Client::removeHeader(const std::string& key) {
+	return false;
+}
+
+//all the methods
+Reply Client::get(const std::string& target) {
+	return Reply(400);
+}
+
+Reply Client::head(const std::string& target) {
+	return Reply(400);
+}
+
+Reply Client::post(const std::string& target, char *body, size_t length) {
+	return Reply(400);
+}
+
+//fetch options for a specific target
+Reply Client::options(const std::string& target) {
+	return Reply(400);
+}
+
+//fetch global options ie: "OPTIONS * HTTP/1.1\r\n"
+Reply Client::options() {
+	return options("*");
+}
