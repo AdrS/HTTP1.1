@@ -1,7 +1,12 @@
 #include "Connection.hpp"
 
-Connection::Connection(const char* host, int port) : fd(-1), rsize(0),
-								rpos(readBuf), wleft(BUF_SIZE), wpos(writeBuf) {
+using namespace std;
+
+void Connection::setupConnection(const char* host, int port) {
+	//NOTE: initialization of fd, rsize, rpos, wleft, wpos is taken
+	//care of by the constructor and close (which are always called
+	//right before this)
+
 	//do domain name lookup
 	addrinfo hints;
 	addrinfo *res, *rp;
@@ -29,7 +34,7 @@ Connection::Connection(const char* host, int port) : fd(-1), rsize(0),
 			addr->sin6_port = htons(port);
 		}
 		if(fd == -1) continue;
-		if(connect(fd, rp->ai_addr, rp->ai_addrlen) == 0) break;
+		if(::connect(fd, rp->ai_addr, rp->ai_addrlen) == 0) break;
 	}
 
 	freeaddrinfo(res);
@@ -41,6 +46,11 @@ Connection::Connection(const char* host, int port) : fd(-1), rsize(0),
 	}
 }
 
+Connection::Connection(const char* host, int port) : fd(-1), rsize(0),
+		rpos(readBuf), wleft(BUF_SIZE), wpos(writeBuf) {
+	setupConnection(host, port);
+}
+
 Connection::Connection(int fd) : fd(fd), rsize(0), rpos(readBuf), wleft(BUF_SIZE),
 															wpos(writeBuf) {
 	//verify that file descriptor is for a socket
@@ -49,6 +59,12 @@ Connection::Connection(int fd) : fd(fd), rsize(0), rpos(readBuf), wleft(BUF_SIZE
 		this->fd = -1;
 		throw BadFileDescriptorError();
 	}
+}
+
+//close existing connection and open a new one
+void Connection::connect(const char* host, int port) {
+	close();
+	setupConnection(host, port);
 }
 
 Connection::~Connection() {
@@ -63,6 +79,8 @@ char Connection::readChar() {
 		rsize = recv(fd, readBuf, BUF_SIZE, 0);
 		if(rsize < 0) {
 			rsize = 0;
+
+			//TODO: add descriptions to errors strerror(errno)
 			throw ReadError();
 		}
 		if(rsize == 0) throw NoData();
@@ -93,7 +111,11 @@ size_t Connection::read(char *buf, size_t n) {
 	//(faster than reading to internal buffer and then copying)
 	while(n >= BUF_SIZE) {
 		ssize_t len = recv(fd, cur, BUF_SIZE, 0);
-		if(len < 0) throw ReadError();
+		if(len < 0) {
+			//TODO: remove me
+			cout << strerror(errno) << endl;
+			throw ReadError();
+		}
 		//early eof
 		if(len == 0) {
 			return (cur - buf);
@@ -107,6 +129,8 @@ size_t Connection::read(char *buf, size_t n) {
 		rsize = recv(fd, rpos, BUF_SIZE, 0);
 		if(rsize < 0) {
 			rsize = 0;
+			//TODO: remove me
+			cout << strerror(errno) << endl;
 			throw ReadError();
 		}
 		if(rsize == 0) {
@@ -220,4 +244,8 @@ void Connection::close() {
 		//TODO: handle errors
 		::close(fd);
 	}
+	//prevent accidental use after closing
+	fd = -1;
+	rsize = 0;
+	rpos = readBuf;
 }

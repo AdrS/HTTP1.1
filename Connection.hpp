@@ -1,6 +1,9 @@
 #ifndef CONNECTION_HPP
 #define CONNECTION_HPP
 
+#include <iostream>
+#include <errno.h>
+
 #include <exception>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -32,14 +35,20 @@ class Connection {
 	//TODO: add support for timeouts
 
 	//Do not want to have to deal with these yet
-	Connection(const Connection &);
 	const Connection& operator=(const Connection&);
+	Connection(const Connection &);
+
+	//this does the work of setting up connections for the
+	//constructor and reconnect
+	void setupConnection(const char* host, int port);
 public:
 	//
 	Connection(const char* host, int port);
 	//takes the file descriptor of the existing socket to wrap
 	Connection(int fd);
 	~Connection();
+	//close existing connection and open a new one
+	void connect(const char* host, int port);
 	char readChar();
 	size_t read(char *buf, size_t n);
 	//returns true if internal read buffer still has data

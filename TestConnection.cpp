@@ -101,9 +101,52 @@ void test_sendLine() {
 	}
 }
 
+void test_connect() {
+	char buf[1024];
+	size_t len = 0;
+	string host = "localhost";
+	int port = 1234;
+	Connection c(host.c_str(), port);
+	bool connected = true;
+	while(true) {
+		while(true) {
+			strcpy(buf, "ping");
+			c.sendLine(buf, 4);
+			try {
+				len = c.readLine(buf, 1024);
+			} catch(ReadError &e) {
+				cout << "Read error, closing connection" << endl;
+				c.close();
+				break;
+			}
+			if(len == 0) {
+				cout << "Connection closed" << endl;
+				break;
+			}
+			cout << "Read " << len  << " bytes from " << host << ":" << port << endl;
+			cout << buf << endl;
+		}
+		connected = false;
+		while(!connected) {
+			do {
+				cout << "Enter new host and port: ";
+				cin >> host >> port;
+				if(host == "quit") return;
+			} while(port < 1 || port > (2 << 16) - 1);
+			try {
+				c.connect(host.c_str(), port);
+				connected = true;
+			} catch(NameResolutionError &e) {
+				cout << "Name resolution error" << endl;
+			} catch(ConnectionEstablishmentError &e) {
+				cout << "Connection Establishment Error" << endl;
+			}
+		}
+	}
+}
+
 int main() {
 	cout << "Starting connection tests..." << endl;
-	test_send_char();
-	test_sendLine();
+	test_connect();
 	return 0;
 }
