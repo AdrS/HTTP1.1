@@ -35,6 +35,11 @@ public:
 class InvalidHeaderKey : std::exception {};
 class InvalidHeaderValue : std::exception {};
 
+//TODO: make HeaderMap wrapper class that handles repeated keys
+//	and key, value validation
+//  The reason I am currently hiding the HeaderMap in client is
+//	to ensure that the host key is always there, but it would
+//	make more sense to just set it when calling get...
 typedef std::map<std::string, std::string> HeaderMap;
 
 //reads headers starting after the start line until there is an empty line
@@ -45,6 +50,8 @@ HeaderMap parseHeaders(Connection& c, char *buf, size_t BUF_SIZE);
 //parsers http version string ie; HTTP/x.x
 //NOTE: this function modifies the string
 void parseVersion(char *vs, int& major, int& minor);
+
+std::string lower(const std::string& s);
 
 class Reply {
 	int status;
@@ -79,12 +86,16 @@ public:
 	//closes existing connection and connects to new host
 	void reconnect(const std::string& host, int port = 80);
 
-	//return true only if header already present
+	//return true only if header is newly inserted
 	//if key is Cookie or Set-Cookie, ';' is used as delimiter. Otherwise ',' is used.
 	bool setHeader(const std::string& key, const std::string& value, bool append = true);
 
 	//If removes header and return true (if header present).
 	bool removeHeader(const std::string& key);
+
+	//get iterators for headers
+	HeaderMap::const_iterator beginHeaders() const;
+	HeaderMap::const_iterator endHeaders() const;
 
 	//all the methods
 	Reply get(const std::string& target);

@@ -114,6 +114,12 @@ void test_parseVersion() {
 	} catch(HTTPError &e) {}
 }
 
+void test_lower() {
+	assert(lower("Adrian") == "adrian");
+	assert(lower("CAMELS") == "camels");
+	assert(lower("C++0x") == "c++0x");
+}
+
 int main() {
 	cout << "Starting HTTP tests ..." << endl;
 	test_normalizeLineEnding();
@@ -122,5 +128,6 @@ int main() {
 	test_validHeaderValue();
 //	test_parseHeaders();
 	test_parseVersion();
+	test_lower();
 	return 0;
 }

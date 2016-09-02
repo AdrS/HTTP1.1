@@ -169,15 +169,50 @@ void Client::reconnect(const std::string& host, int port) {
 	con.connect(this->host.c_str(), port);
 }
 
-//return true only if header already present
+HeaderMap::const_iterator Client::beginHeaders() const {
+	return headers.cbegin();
+}
+
+HeaderMap::const_iterator Client::endHeaders() const {
+	return headers.cend();
+}
+
+string lower(const string& s) {
+	string l(s);
+	for(auto  i = l.begin(); i != l.end(); ++i) *i = tolower(*i);
+	return l;
+}
+
+//return true only if header is newly inserted
 //if key is Cookie or Set-Cookie, ';' is used as delimiter. Otherwise ',' is used.
-bool Client::setHeader(const std::string& key, const std::string& value, bool append) {
+bool Client::setHeader(const string& key, const string& value, bool append) {
+	//make sure no bad keys slip in
+	if(!validHeaderKey(key.c_str())) throw InvalidHeaderKey();
+	if(!validHeaderValue(value.c_str())) throw InvalidHeaderValue();
+
+	//normalize keys to lowercase
+	auto res = headers.insert(make_pair(lower(key), value));
+	//new key inserted
+	if(res.second) return true;
+	if(append) {
+		//use ';' as delim for cookies
+		auto it = res.first;
+		if(it->first == "cookie" || it->first == "set-cookie") {
+			it->second.append(1,';');
+			it->second.append(value);
+		} else {
+			it->second.append(1,',');
+			it->second.append(value);
+		}
+	}
+
+	//key already present
 	return false;
 }
 
 //If removes header and return true (if header present).
 bool Client::removeHeader(const std::string& key) {
-	return false;
+	return headers.erase(lower(key)) > 0;
 }
 
 //all the methods
