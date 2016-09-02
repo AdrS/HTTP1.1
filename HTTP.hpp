@@ -24,6 +24,9 @@ public:
 //this takes a pointer to the buffer to use for storing lines
 HeaderMap parseHeaders(Connection& c, char *buf, size_t BUF_SIZE);
 
+//send headers across connection followed by final empty line (CRLF)
+size_t sendHeaders(Connection& c, const HeaderMap& headers);
+
 //parsers http version string ie; HTTP/x.x
 //NOTE: this function modifies the string
 void parseVersion(char *vs, int& major, int& minor);
@@ -38,11 +41,14 @@ public:
 	int status;
 	HeaderMap headers;
 
-	Reply(int status);
+	Reply(int status, const HeaderMap& headers);
 	Reply(Reply&& r);
 };
 
 class Client {
+	//TODO: no majic numbers
+	char buf[100];
+
 	std::string host;
 	int port;
 	Connection con;
