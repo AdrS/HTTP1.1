@@ -4,6 +4,52 @@
 
 using namespace std;
 
+void test_tchar() {
+	cout << "testing tchar ..." << endl;
+
+	const char *tc = "!#$%&'*+-.^_`|~abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+	const char *p;
+	for(int i = 0; i < 256; ++i) {
+		bool t = tchar((char)i);
+		for(p = tc; *p; ++p) {
+			if(*p == (char)i) {
+				assert(t);
+				break;
+			}
+		}
+		if(!*p) assert(!t);
+	}
+	cout << "PASS!!!" << endl;
+}
+
+void test_isToken() {
+	cout << "testing isToken ..." << endl;
+	assert(isToken("hello"));
+	assert(isToken("$df1"));
+
+	assert(!isToken(""));
+	assert(!isToken("asdf sd"));
+	assert(!isToken("asdfsd "));
+	cout << "PASS!!!" << endl;
+}
+
+void test_validHeaderValue() {
+	cout << "testing validHeaderValue ..." << endl;
+	assert(validHeaderValue("hello"));
+	assert(validHeaderValue("sdfkj;alsk jlkfa8098709234 *6789568214ac sjdf s"));
+	assert(validHeaderValue("sdf\t\t\t   s"));
+
+	assert(!validHeaderValue(""));
+	assert(!validHeaderValue(" asdf"));
+	assert(!validHeaderValue("asdf "));
+	assert(!validHeaderValue("\tasdf"));
+	assert(!validHeaderValue("as \ndf"));
+	assert(!validHeaderValue("as \rdf"));
+	assert(!validHeaderValue("as \bdf"));
+	assert(!validHeaderValue("as \007df"));
+	cout << "PASS!!!" << endl;
+}
+
 void test_capitalize() {
 	assert(capitalize("Adrian") == "Adrian");
 	assert(capitalize("aDrian") == "Adrian");
@@ -55,6 +101,11 @@ void test_find() {
 	hm.insert("Cookie", "id=1234;lang=en");
 	hm.insert("User-Agent", "???");
 
+	//iterators work
+	for(auto &i : hm) {
+		cout << i.first << ": " << i.second << endl;
+	}
+
 	auto it = hm.find("Host");
 	assert(it->first == "Host" && it->second == "www.google.com");
 
@@ -62,7 +113,7 @@ void test_find() {
 	assert(hm.find("user-agent") == hm.find("user-Agent"));
 
 	//test search for nonexisting element
-	assert(hm.find("Keep-alive") == hm.cend());
+	assert(hm.find("Keep-alive") == hm.end());
 }
 
 void test_erase() {
@@ -82,6 +133,9 @@ void test_erase() {
 
 int main() {
 	cout << "Testing HeaderMap..." << endl;
+	test_tchar();
+	test_isToken();
+	test_validHeaderValue();
 	test_capitalize();
 	test_insert();
 	test_find();

@@ -1,67 +1,43 @@
 #ifndef HTTP_H
 #define HTTP_H
 
-#include <iostream>
-#include <exception>
-#include <cctype>
 #include <cassert>
+#include <cstring>
+#include <exception>
 #include <string>
-#include <map>
-#include <utility>
 #include "Connection.hpp"
-
-//TODO: most of this could be made private, but is public for now to. Make sure to move
-//comments when to cpp
-
-//TODO: make exceptions for HTTP errors have reason string
-//	ex: "headers too long"
+#include "HeaderMap.hpp"
 
 //replaces CRLF at end of line (if present) with LF '\0' and returns new length
 size_t normalizeLineEnding(char *line, size_t len);
 
-//	facilitate easier testing
-bool tchar(char c);
-bool isToken(const char *t);
-bool validHeaderKey(const char *k);
-//NOTE: will not accept folded header values (which are obsolete)
-bool validHeaderValue(const char *v);
-
+//TODO: make exceptions for HTTP errors have reason string
+//	ex: "headers too long"
 class HTTPError : std::exception {
 public:
 	HTTPError(const int status_code) : status(status_code) {}
 	const int status;
 };
 
-class InvalidHeaderKey : std::exception {};
-class InvalidHeaderValue : std::exception {};
-
-//TODO: make HeaderMap wrapper class that handles repeated keys
-//	and key, value validation
-//  The reason I am currently hiding the HeaderMap in client is
-//	to ensure that the host key is always there, but it would
-//	make more sense to just set it when calling get...
-typedef std::map<std::string, std::string> HeaderMap;
-
 //reads headers starting after the start line until there is an empty line
 //NOTE: this treats LF and CRLF as both being empty lines
-//this takes a pointer to the buffer to reuse so memory is conserved
+//this takes a pointer to the buffer to use for storing lines
 HeaderMap parseHeaders(Connection& c, char *buf, size_t BUF_SIZE);
 
 //parsers http version string ie; HTTP/x.x
 //NOTE: this function modifies the string
 void parseVersion(char *vs, int& major, int& minor);
 
-std::string lower(const std::string& s);
-
 class Reply {
-	int status;
-	HeaderMap headers;
 	char *body;	//TODO: does unique_ptr make more sense?
 	size_t length;
 	//do not have to deal with this
 	Reply(const Reply&);
 	const Reply& operator=(const Reply&);
 public:
+	int status;
+	HeaderMap headers;
+
 	Reply(int status);
 	Reply(Reply&& r);
 };
@@ -70,11 +46,11 @@ class Client {
 	std::string host;
 	int port;
 	Connection con;
-	HeaderMap headers;
 	//implement these later
 	Client(const Client&);
 	const Client& operator=(const Client&);
 public:
+	HeaderMap headers;
 	//create TCP connection to host:port
 	Client(const std::string& host, int port = 80);
 	//No need for custom destructor (yet)
@@ -86,17 +62,6 @@ public:
 	//closes existing connection and connects to new host
 	void reconnect(const std::string& host, int port = 80);
 
-	//return true only if header is newly inserted
-	//if key is Cookie or Set-Cookie, ';' is used as delimiter. Otherwise ',' is used.
-	bool setHeader(const std::string& key, const std::string& value, bool append = true);
-
-	//If removes header and return true (if header present).
-	bool removeHeader(const std::string& key);
-
-	//get iterators for headers
-	HeaderMap::const_iterator beginHeaders() const;
-	HeaderMap::const_iterator endHeaders() const;
-
 	//all the methods
 	Reply get(const std::string& target);
 	Reply head(const std::string& target);
@@ -106,6 +71,5 @@ public:
 	//fetch global options ie: "OPTIONS * HTTP/1.1\r\n"
 	Reply options();
 };
-
 
 #endif

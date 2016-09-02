@@ -1,14 +1,23 @@
 CXX = g++
 CXXFLAGS = -Wall -Werror -pedantic -std=c++11 -g
 
-TestHTTP: TestHTTP.o HTTP.o Connection.o
-	$(CXX) $(CXXFLAGS) TestHTTP.o HTTP.o Connection.o -o TestHTTP
+TestHTTP: TestHTTP.o HTTP.o Connection.o HeaderMap.o
+	$(CXX) $(CXXFLAGS) TestHTTP.o HTTP.o Connection.o HeaderMap.o -o TestHTTP
 
-TestHTTP.o: TestHTTP.cpp HTTP.hpp
+TestHTTP.o: TestHTTP.cpp HTTP.hpp HeaderMap.hpp
 	$(CXX) $(CXXFLAGS) -c TestHTTP.cpp
 
 HTTP.o: HTTP.cpp HTTP.hpp Connection.hpp
 	$(CXX) $(CXXFLAGS) -c HTTP.cpp
+
+TestHeaderMap: TestHeaderMap.o HeaderMap.o
+	$(CXX) $(CXXFLAGS) TestHeaderMap.o HeaderMap.o -o TestHeaderMap
+
+TestHeaderMap.o: TestHeaderMap.cpp HeaderMap.hpp
+	$(CXX) $(CXXFLAGS) -c TestHeaderMap.cpp
+
+HeaderMap.o: HeaderMap.hpp HeaderMap.cpp
+	$(CXX) $(CXXFLAGS) -c HeaderMap.cpp
 
 TestURL: TestURL.o URL.o
 	$(CXX) $(CXXFLAGS) TestURL.o URL.o -o TestURL
@@ -28,10 +37,11 @@ TestConnection.o: TestConnection.cpp Connection.hpp
 Connection.o: Connection.cpp Connection.hpp
 	$(CXX) $(CXXFLAGS) -c Connection.cpp
 
-test: TestConnection TestURL TestHTTP
+test: TestConnection TestURL TestHTTP TestHeaderMap
+	./TestHeaderMap
 	./TestHTTP
 	./TestURL
 	./TestConnection
 
 clean:
-	rm -rf *.o TestConnection TestURL TestHTTP
+	rm -rf *.o TestConnection TestURL TestHTTP TestHeaderMap

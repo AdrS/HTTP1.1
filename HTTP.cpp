@@ -1,6 +1,6 @@
 #include "HTTP.hpp"
 
-using std::string; using std::pair; using std::make_pair;
+using std::string;
 
 //NOTE: this assumes line end in '\n' and might fail if this is not the case
 size_t normalizeLineEnding(char *line, size_t len) {
@@ -12,41 +12,6 @@ size_t normalizeLineEnding(char *line, size_t len) {
 	return len;
 }
 
-//tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "." /
-//    "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
-//TODO: lookup tables would be faster
-bool tchar(char c) {
-	return isalnum(c) || c == '!' || ('#' <= c && c <= '\'') || c == '*' ||
-			c == '+' || c == '-' || c == '.' || c == '^' || c == '_' ||
-			c == '`' || c == '|' || c == '~';
-}
-
-//token = 1*tchar
-bool isToken(const char *t) {
-	//empty string => not token
-	if(!*t) return false;
-	//all characters should be tchars
-	while(*t) if(!tchar(*t++)) return false;
-	return true;
-}
-
-bool validHeaderKey(const char *k) {
-	return isToken(k);
-}
-
-//NOTE: this does not support obsolete folded headers
-//valid header values must begin and end with visible characters and
-//include only visible characters, spaces, and tabs ie: '\t'
-bool validHeaderValue(const char *v) {
-	//check that first char is visible (note: this also rules out empty values)
-	if(!isgraph(*v++)) return false;
-	while(*v) {
-		if(!(*v == ' ' || *v == '\t' || isgraph(*v))) return false;
-		++v;
-	}
-	//check that last character is visible
-	return isgraph(*(v - 1));
-}
 
 //TODO: should I treat repeated header names as an error?
 //A sender MUST NOT generate multiple header fields with the same field name
@@ -78,45 +43,23 @@ HeaderMap parseHeaders(Connection& c, char *buf, size_t BUF_SIZE) {
 		//check that there actually is a seperator
 		if(*pos == '\n') throw HTTPError(400);
 		*pos++ = '\0';
-		if(!validHeaderKey(buf)) throw HTTPError(400);
 
-		//Header keys are case insensitive (values may or may not be)
-		//Normalize header keys to lowercase
-		//TODO: lots of broken software does case sensitive comparisons
-		//	and experts word to be capitalized
-		//TODO: write a capitalize function
-		for(char *i = buf; *i; ++i) *i = tolower(*i);
-
-		string key(buf);
+		char *key = buf;
 
 		///////////PARSE HEADER VALUE///////////////
 		//skip over whitespace
 		while(*pos == ' ' || *pos == '\t') ++pos;
 
 		//store last non whitespace for trailing OWS removal
-		char *lastNonWS = pos, *hf = pos;
+		char *lastNonWS = pos, *value = pos;
 		while(*pos != '\n') {
 			if(*pos != ' ' && *pos != '\t') lastNonWS = pos;
 			++pos;
 		}
 		lastNonWS[1] = '\0';
-		if(!validHeaderValue(hf)) throw HTTPError(400);
 
-		string value(hf);
-
-		///////////HANDLE COMBINING OF HEADERS/////
-		auto res = hm.insert(make_pair(key, value));
-		//if header key already exists, then combine values
-		if(!res.second) {
-			auto it = res.first;
-			//if cookie header, use ';' as seperator
-			if(it->first == "set-cookie" || it->first == "cookie") {
-				it->second.append(1,';');
-			} else {
-				it->second.append(1,',');
-			}
-			it->second.append(value);
-		}
+		//this takes care of header validation
+		hm.insert(key, value);
 	}
 	return hm;
 }
@@ -134,7 +77,7 @@ void parseVersion(char *vs, int& major, int& minor) {
 	if(strcmp(vs, "HTTP/x.x")) throw HTTPError(400);
 }
 
-Reply::Reply(int status) : status(status), body(nullptr), length(0) {
+Reply::Reply(int status) : body(nullptr), length(0), status(status) {
 	assert(status >= 100 && status <= 599);
 }
 
@@ -148,10 +91,7 @@ Reply::Reply(Reply&& r) {
 }
 
 Client::Client(const std::string& host, int port) : host(host),
-		port(port), con(host.c_str(), port) {
-	//Host is required for all HTTP/1.1 requests so lets add it
-	setHeader("host", host, false);
-}
+		port(port), con(host.c_str(), port) { }
 
 void Client::disconnect() {
 	con.close();
@@ -164,57 +104,10 @@ void Client::reconnect() {
 void Client::reconnect(const std::string& host, int port) {
 	this->host = host;
 	this->port = port;
-	//new host => must change header
-	setHeader("host", this->host, false);
 	con.connect(this->host.c_str(), port);
 }
 
-HeaderMap::const_iterator Client::beginHeaders() const {
-	return headers.cbegin();
-}
-
-HeaderMap::const_iterator Client::endHeaders() const {
-	return headers.cend();
-}
-
-string lower(const string& s) {
-	string l(s);
-	for(auto  i = l.begin(); i != l.end(); ++i) *i = tolower(*i);
-	return l;
-}
-
-//return true only if header is newly inserted
-//if key is Cookie or Set-Cookie, ';' is used as delimiter. Otherwise ',' is used.
-bool Client::setHeader(const string& key, const string& value, bool append) {
-	//make sure no bad keys slip in
-	if(!validHeaderKey(key.c_str())) throw InvalidHeaderKey();
-	if(!validHeaderValue(value.c_str())) throw InvalidHeaderValue();
-
-	//normalize keys to lowercase
-	auto res = headers.insert(make_pair(lower(key), value));
-	//new key inserted
-	if(res.second) return true;
-	if(append) {
-		//use ';' as delim for cookies
-		auto it = res.first;
-		if(it->first == "cookie" || it->first == "set-cookie") {
-			it->second.append(1,';');
-			it->second.append(value);
-		} else {
-			it->second.append(1,',');
-			it->second.append(value);
-		}
-	}
-
-	//key already present
-	return false;
-}
-
-//If removes header and return true (if header present).
-bool Client::removeHeader(const std::string& key) {
-	return headers.erase(lower(key)) > 0;
-}
-
+//DO remember to send Host header first (do no keep it in HeaderMap)
 //all the methods
 Reply Client::get(const std::string& target) {
 	return Reply(400);

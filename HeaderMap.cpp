@@ -98,11 +98,11 @@ bool HeaderMap::erase(const string& key) {
 	return m.erase(capitalize(key)) > 0;
 }
 
-HeaderMapIterator HeaderMap::cbegin() const {
+HeaderMapIterator HeaderMap::begin() const {
 	return m.cbegin();
 }
 
-HeaderMapIterator HeaderMap::cend() const {
+HeaderMapIterator HeaderMap::end() const {
 	return m.cend();
 }
 

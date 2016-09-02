@@ -33,8 +33,8 @@ public:
 	HeaderMapIterator find(const std::string& key) const;
 	//removes element with key from container, returns true if element removed
 	bool erase(const std::string& key);
-	HeaderMapIterator cbegin() const;
-	HeaderMapIterator cend() const;
+	HeaderMapIterator begin() const;
+	HeaderMapIterator end() const;
 	size_t size() const;
 	bool empty() const;
 };
