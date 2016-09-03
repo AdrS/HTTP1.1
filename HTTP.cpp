@@ -1,8 +1,9 @@
 #include "HTTP.hpp"
 
-using std::string;
+using std::string; using std::min;
 
 const size_t Client::BUF_SIZE;
+const size_t ClientConnection::BUF_SIZE;
 
 //NOTE: this assumes line end in '\n' and might fail if this is not the case
 size_t normalizeLineEnding(char *line, size_t len) {
@@ -66,6 +67,7 @@ HeaderMap parseHeaders(Connection& c, char *buf, size_t BUF_SIZE) {
 	return hm;
 }
 
+//TODO: make final CRLF optional
 //send headers across connection followed by final empty line (CRLF)
 size_t sendHeaders(Connection& c, const HeaderMap& headers) {
 	size_t len = 0;
@@ -84,6 +86,31 @@ size_t sendHeaders(Connection& c, const HeaderMap& headers) {
 	c.sendChar('\r');
 	c.sendChar('\n');
 	return len + 2;
+}
+
+size_t sendChunked(Connection& c, const char *buf, size_t len,
+	const HeaderMap *trailers, size_t chunkSize) {
+	size_t total = len;
+	char lb[16];	//stores chunk length (in hex) and CRLF (16 bytes is overkill)
+	while(len > 0) {
+		size_t curLen = min(len, chunkSize);
+		total += snprintf(lb, 16, "%X\r\n", curLen);
+		c.sendLine(lb, false);
+		c.send(buf, curLen);
+		buf += curLen;
+		len -= curLen;
+	}
+	c.sendLine("0\r\n", false);
+	total += 3;
+	if(trailers) {
+		//TODO: check for illegal trailer headers
+		total += sendHeaders(c, *trailers);
+	} else {
+		// send final CRLF
+		c.sendChar('\r');
+		c.sendChar('\n');
+	}
+	return total;
 }
 
 //HTTP-name = %x48.54.54.50 ; HTTP
@@ -113,8 +140,10 @@ Reply::Reply(Reply&& r) {
 	length = r.length;
 }
 
+////////////////////CLIENT CODE//////////////////////
 Client::Client(const std::string& host, int port) : host(host),
-	port(port), con(host.c_str(), port) { }
+	port(port), con(host.c_str(), port), keepAlive(true) { }
+//keep alive is true by default for HTTP/1.1 (not HTTP/1.0)
 
 void Client::disconnect() {
 	con.close();
@@ -175,3 +204,6 @@ Reply Client::options(const std::string& target) {
 Reply Client::options() {
 	return options("*");
 }
+
+////////////////////SERVER CODE//////////////////////
+ClientConnection::ClientConnection(int fd) : con(fd), keepAlive(true) {}

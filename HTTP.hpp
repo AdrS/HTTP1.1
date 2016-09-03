@@ -1,6 +1,7 @@
 #ifndef HTTP_H
 #define HTTP_H
 
+#include <algorithm>
 #include <cassert>
 #include <cstring>
 #include <exception>
@@ -27,6 +28,19 @@ HeaderMap parseHeaders(Connection& c, char *buf, size_t BUF_SIZE);
 
 //send headers across connection followed by final empty line (CRLF)
 size_t sendHeaders(Connection& c, const HeaderMap& headers);
+
+//sends data as chunks and if given trailers sends those too
+//returns total length of data sent
+size_t sendChunked(Connection& c, const char *buf, size_t len,
+	const HeaderMap *trailers = nullptr, size_t chunkSize = 1024);
+
+//Q: how to return body + length? unique_ptr??
+//size_t parseChunked(Connection& c, HeaderMap &headers, char *&i)
+
+//size_t sendBody(Connection& c, char *body, size_t len, bool chunked);
+
+//NOTE: if Connection: close, then server does not have to send Content-Length and
+//	can signal end of payload by closing connection
 
 //parsers http version string ie; HTTP/x.x
 //NOTE: this function modifies the string
@@ -55,6 +69,7 @@ class Client {
 	std::string host;
 	int port;
 	Connection con;
+	bool keepAlive;
 	//implement these later
 	Client(const Client&);
 	const Client& operator=(const Client&);
@@ -87,6 +102,7 @@ class ClientConnection {
 	char buf[BUF_SIZE];
 
 	Connection con;
+	bool keepAlive;
 public:
 	ClientConnection(int fd);
 };

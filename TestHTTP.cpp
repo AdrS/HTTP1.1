@@ -83,12 +83,25 @@ void test_get() {
 	}
 }
 
+void test_sendChunked() {
+	Connection c("localhost", 1234);
+	string s = "When in the course of human events, it becomes necessary for one people\nto I forget the rest. ... We the people, in order to form a more perfect union, establish justice, and ensure domestic tranquility, provide to for the general defense...";
+	sendChunked(c, s.c_str(), s.length(), nullptr, 10);
+	HeaderMap hm;
+	hm.insert("Custom-header", "abcdefg");
+	hm.insert("Cookie", "uid=1234");
+	
+	sendChunked(c, s.c_str(), s.length(), &hm, 20);
+	c.close();
+}
+
 int main() {
 	cout << "Starting HTTP tests ..." << endl;
 	test_normalizeLineEnding();
 //	test_parseHeaders();
 	test_parseVersion();
 	test_client_connection_mangament();
-	test_get();
+//	test_get();
+	test_sendChunked();
 	return 0;
 }
