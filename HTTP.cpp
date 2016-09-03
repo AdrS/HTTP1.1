@@ -2,6 +2,8 @@
 
 using std::string;
 
+const size_t Client::BUF_SIZE;
+
 //NOTE: this assumes line end in '\n' and might fail if this is not the case
 size_t normalizeLineEnding(char *line, size_t len) {
 	if(len > 1 && line[len - 2] == '\r') {
@@ -112,7 +114,7 @@ Reply::Reply(Reply&& r) {
 }
 
 Client::Client(const std::string& host, int port) : host(host),
-		port(port), con(host.c_str(), port) { }
+	port(port), con(host.c_str(), port) { }
 
 void Client::disconnect() {
 	con.close();
@@ -143,13 +145,14 @@ Reply Client::get(const std::string& target) {
 
 	//send rest of headers (I assume host is not in this list)
 	sendHeaders(con, headers);
+	con.flush();
 
 	
 	//parse status line
-	con.readLine(buf, 100);
+	con.readLine(buf, BUF_SIZE);
 
 	//parse headers
-	HeaderMap replyHeaders = parseHeaders(con, buf, 100);
+	HeaderMap replyHeaders = parseHeaders(con, buf, BUF_SIZE);
 
 	//get body
 	return Reply(400, replyHeaders);

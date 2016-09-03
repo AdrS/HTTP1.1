@@ -69,10 +69,26 @@ void test_parseVersion() {
 	} catch(HTTPError &e) {}
 }
 
+void test_client_connection_mangament() {
+}
+
+void test_get() {
+	Client c("localhost", 1234);
+	c.headers.insert("Cookie", "uid=1234");
+	c.headers.insert("User-Agent", "Adrian's HTTP client");
+	Reply r = c.get("/");
+	cout << "Status: " << r.status << endl;
+	for(auto &i : r.headers) {
+		cout << i.first << ": " << i.second << endl;
+	}
+}
+
 int main() {
 	cout << "Starting HTTP tests ..." << endl;
 	test_normalizeLineEnding();
 //	test_parseHeaders();
 	test_parseVersion();
+	test_client_connection_mangament();
+	test_get();
 	return 0;
 }

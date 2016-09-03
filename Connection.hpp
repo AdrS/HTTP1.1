@@ -32,7 +32,7 @@ class Connection {
 	char writeBuf[BUF_SIZE];
 	size_t wleft;	//space left at end of buffer
 	char *wpos;		//location to append data to
-	//TODO: add support for timeouts
+	//TODO: add support for timeouts + automatic flushing of data that has been buffered for a while
 
 	//Do not want to have to deal with these yet
 	const Connection& operator=(const Connection&);

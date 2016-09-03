@@ -143,6 +143,48 @@ void test_percentEncode() {
 	
 	cout << "PASS!!!" << endl;
 }
+
+void test_validDomainName() {
+	//for use in validating host header I do not what this to be treated as valid
+	assert(!validDomainName(""));
+	assert(!validDomainName("."));
+
+	//bad chars
+	assert(!validDomainName("http://en.cppreference.com"));
+
+	//bad label(s)
+	assert(!validDomainName("1asf"));
+	assert(!validDomainName("-asf"));
+	assert(!validDomainName("cabage.asf-.bs"));
+	assert(!validDomainName("hi.as&f"));
+	//too long label
+	assert(!validDomainName("a.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));
+	//empty label
+	assert(!validDomainName("hi..f"));
+
+	//too long domain
+	assert(!validDomainName("ba.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a"));
+
+	//max length
+	assert(validDomainName("a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a.a"));
+
+	assert(validDomainName("tools.ietf.org"));
+	assert(validDomainName("en.cppreference.com"));
+	assert(validDomainName("e3.c--ppre1234ference.com.kAt5-3at-mice.tld"));
+}
+
+void test_validHostname() {
+	assert(validHostname("www.adrianstoll.com"));
+	assert(validHostname("en.wikipedia.ord"));
+	assert(validHostname("127.0.0.1"));
+	assert(validHostname("localhost"));
+	assert(validHostname("2001:0db8:85a3:0000:0000:8a2e:0370:7334"));
+	assert(validHostname("::"));
+
+	assert(!validHostname("257.0.0.1"));
+	assert(!validHostname("200H:0db8:85a3:0000:0000:8a2e:0370:7334"));
+}
+
 int main() {
 	cout << "Starting URL.cpp tests ..." << endl;
 	test_unreserved();
@@ -152,6 +194,8 @@ int main() {
 	test_percentDecode();
 	test_percentDecodeUnreserved();
 	test_percentEncode();
+	test_validDomainName();
+	test_validHostname();
 	cout << "All tests complete." << endl;
 	return 0;
 }

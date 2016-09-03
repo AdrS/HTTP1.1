@@ -5,11 +5,22 @@
 #include <cctype>
 #include <cstddef>
 #include <cassert>
+#include <arpa/inet.h>
 
 bool unreserved(char c);
 bool subDelim(char c);
 bool genDelim(char c);
 bool reserved(char c);
+
+bool validDomainName(const char *name);
+bool validIPv4Address(const char *addr);
+bool validIPv6Address(const char *addr);
+
+class InvalidHostname : std::exception {};
+class InvalidPort : std::exception {};
+
+//see: https://tools.ietf.org/html/rfc3986#section-3.2.2
+bool validHostname(const char *host);
 
 char decodeHexChar(char c);
 

@@ -1,6 +1,7 @@
 #include "URL.hpp"
 #include <cstdint>
 
+//TODO: replace with lookup table to improve speed
 //unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~"
 bool unreserved(char c) {
 	return isalnum(c) || c == '-' || c == '.' || c == '_' || c == '~';
@@ -19,6 +20,50 @@ bool genDelim(char c) {
 //reserved = gen-delims / sub-delims
 bool reserved(char c) {
 	return genDelim(c) || subDelim(c);
+}
+
+//see: rfc 1035 2.3.1
+//NOTE: I am not considering an empty string to be a valid domain
+bool validDomainName(const char *name) {
+	const char *pos = name;
+	//for each label
+	while(true) {
+		const char *lstart = pos;
+		//label must start with letter
+		if(!isalpha(*pos++)) return false;
+
+		//'.' is used to separate labels
+		while(*pos != '.' && *pos != '\0') {
+			//labels must contain only a-zA-Z0-9 and hyphens
+			if(!(isalnum(*pos) || *pos == '-')) return false;
+			++pos;
+		}
+		//label must end with letter or digit
+		if(!isalnum(*(pos - 1))) return false;
+		//label must be 1-63 chars long
+		if(pos - lstart > 63) return false;
+		if(*pos == '\0') break;
+		++pos;
+	};
+	//TODO: add support for trailing period (if trailing period present max len is 254)
+	//TODO: look into rules about trailing period
+	//total domain name must be < 254 characters //TODO: check this
+	return pos - name < 254;
+}
+
+bool validIPv4Address(const char *addr) {
+	char tmp[4];
+	return inet_pton(AF_INET, addr, tmp) == 1;
+}
+
+bool validIPv6Address(const char *addr) {
+	char tmp[16];
+	return inet_pton(AF_INET6, addr, tmp) == 1;
+}
+
+//a hostname must be a valid domain name or a valid ip address
+bool validHostname(const char *host) {
+	return validDomainName(host) || validIPv4Address(host) || validIPv6Address(host);
 }
 
 //takes character 0-9 | a-f | A-F and returns corrisponding hex value
@@ -132,5 +177,14 @@ pchar         = unreserved / pct-encoded / sub-delims / ":" / "@"
 
 query = *( pchar / "/" / "?" )
 
+//TODO: write hostname validation
 Host = uri-host [ ":" port ]
+-just do dns name (labels a-zA-Z0-9-. < 64 chars total < 256)
+-ipv4 address ie: a.b.c (more resriction ie: don't use weird broadcast addresses)
+
+uri-host = IP-literal / IPv4address / reg-name
+IP-literal = "[" ( IPv6address / IPvFuture  ) "]"
+IPvFuture  = "v" 1*HEXDIG "." 1*( unreserved / sub-delims / ":" )
+IPv4address = dec-octet "." dec-octet "." dec-octet "." dec-octet
+reg-name    = *( unreserved / pct-encoded / sub-delims )
 **********************************************************************/

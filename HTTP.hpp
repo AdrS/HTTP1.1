@@ -7,6 +7,7 @@
 #include <string>
 #include "Connection.hpp"
 #include "HeaderMap.hpp"
+#include "URL.hpp"
 
 //replaces CRLF at end of line (if present) with LF '\0' and returns new length
 size_t normalizeLineEnding(char *line, size_t len);
@@ -45,9 +46,11 @@ public:
 	Reply(Reply&& r);
 };
 
+//HTTP client implementation
 class Client {
-	//TODO: no majic numbers
-	char buf[100];
+	//internal buffer for storing lines
+	static const size_t BUF_SIZE = 8096;
+	char buf[BUF_SIZE];
 
 	std::string host;
 	int port;
@@ -76,6 +79,16 @@ public:
 	Reply options(const std::string& target);
 	//fetch global options ie: "OPTIONS * HTTP/1.1\r\n"
 	Reply options();
+};
+
+//holds server state associated with a connection
+class ClientConnection {
+	static const size_t BUF_SIZE = 8096;
+	char buf[BUF_SIZE];
+
+	Connection con;
+public:
+	ClientConnection(int fd);
 };
 
 #endif
