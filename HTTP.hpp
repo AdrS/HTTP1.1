@@ -5,7 +5,10 @@
 #include <cassert>
 #include <cstring>
 #include <exception>
+#include <list>
+#include <memory>
 #include <string>
+#include <utility>
 #include "Connection.hpp"
 #include "HeaderMap.hpp"
 #include "URL.hpp"
@@ -21,21 +24,32 @@ public:
 	const int status;
 };
 
+//sends request line for given target (percent encodes first by default)
+//WARNING: when sending OPTIONS * HTTP/1.1\r\n, SET ENCODE TO FALSE
+size_t sendRequestLine(Connection& c, const std::string& method,
+	const std::string& target, bool encode = true);
+
+//send headers across connection followed by final empty line (CRLF)
+size_t sendHeaders(Connection& c, const HeaderMap& headers);
+
 //reads headers starting after the start line until there is an empty line
 //NOTE: this treats LF and CRLF as both being empty lines
 //this takes a pointer to the buffer to use for storing lines
 HeaderMap parseHeaders(Connection& c, char *buf, size_t BUF_SIZE);
 
-//send headers across connection followed by final empty line (CRLF)
-size_t sendHeaders(Connection& c, const HeaderMap& headers);
-
 //sends data as chunks and if given trailers sends those too
 //returns total length of data sent
+//NOTE: only send trailers if client says they support them
 size_t sendChunked(Connection& c, const char *buf, size_t len,
 	const HeaderMap *trailers = nullptr, size_t chunkSize = 1024);
 
-//Q: how to return body + length? unique_ptr??
-//size_t parseChunked(Connection& c, HeaderMap &headers, char *&i)
+//for internal use (make private after testing)
+int parseChunkLen(const char *line);
+
+typedef std::pair<std::unique_ptr<char[]>, size_t> ChunkPair;
+//takes connection and a buffer to read lines into
+//returns pointer to decoded chunked body + size of body
+ChunkPair parseChunked(Connection& c, char *buf, size_t BUF_SIZE);
 
 //size_t sendBody(Connection& c, char *body, size_t len, bool chunked);
 

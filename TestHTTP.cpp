@@ -139,6 +139,37 @@ void test_parseChunked() {
 	}
 }
 
+struct RL_case {
+	string method;
+	string target;
+	bool pe;
+};
+void test_sendRequestLine() {
+	RL_case tests[] = {
+		{"GET", "\x7\x1\x1/index.html", true},
+		{"GET", "/index.html", true},
+		{"GET", "/Camels are ???.html ", true},
+		{"GET", "/Camels are ???.html ", true},
+		{"GET", "/index.html", false},
+		{"OPTIONS", "/index.html", true},
+		{"OPTIONS", "***********", true},
+		{"OPTIONS", "*", true},
+		{"OPTIONS", "*", false}};
+	tests[0].target[1] = '\0'; //workaround to put null in middle of string
+	char next;
+	for(size_t i = 0; i < 9; ++i) {
+		cout << "Next? ";
+		cin >> next;
+		try {
+			Connection c("localhost", 1234);
+			sendRequestLine(c, tests[i].method, tests[i].target, tests[i].pe);
+			c.close();
+		} catch (...) {
+			cout << "Error" << endl;
+		}
+	}
+}
+
 int main() {
 	cout << "Starting HTTP tests ..." << endl;
 	test_normalizeLineEnding();
@@ -148,6 +179,7 @@ int main() {
 //	test_get();
 //	test_sendChunked();
 	test_parseChunkLen();
-	test_parseChunked();
+//	test_parseChunked();
+	test_sendRequestLine();
 	return 0;
 }

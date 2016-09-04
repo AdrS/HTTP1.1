@@ -15,6 +15,29 @@ size_t normalizeLineEnding(char *line, size_t len) {
 	return len;
 }
 
+//WARNING: when sending OPTIONS * HTTP/1.1\r\n, DO NOT URL ENCODE TARGET
+//sends request line for given target (percent encodes first by default)
+size_t sendRequestLine(Connection& c, const string& method, const string& target, bool encode) {
+	//request-line   = method SP request-target SP HTTP-version CRLF
+	size_t totalLen = 0;
+
+	totalLen += c.send(method.c_str(), method.length());
+	c.sendChar(' ');
+
+	//handle percent encoding
+	if(encode) {
+		size_t peLen = 3*target.length() + 1;
+		unique_ptr<char[]> peTarget(new char[peLen]);
+		peLen = percentEncode(target.c_str(), peTarget.get(), target.length(), peLen);
+
+		totalLen += c.send(peTarget.get(), peLen);
+	} else {
+		totalLen += c.send(target.c_str(), target.length());
+	}
+	c.sendLine(" HTTP/1.1\r\n", false);
+	return totalLen + 12;
+}
+
 //A sender MUST NOT generate multiple header fields with the same field name
 //A recipient MAY combine multiple header fields with the same field name
 HeaderMap parseHeaders(Connection& c, char *buf, size_t BUF_SIZE) {
@@ -173,6 +196,7 @@ ChunkPair parseChunked(Connection& c, char *buf, size_t BUF_SIZE) {
 	}
 
 	//Ignore trailers for now
+	//TODO: should give error if trailers received when TE: trailers is not sent
 	parseHeaders(c, buf, BUF_SIZE);
 
 	//merge chunks into contiguous block
