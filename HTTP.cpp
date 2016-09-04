@@ -1,11 +1,11 @@
 #include "HTTP.hpp"
 
-using std::string; using std::min;
+using std::string; using std::min; using std::pair; using std::unique_ptr; using std::list;
 
 const size_t Client::BUF_SIZE;
 const size_t ClientConnection::BUF_SIZE;
 
-//NOTE: this assumes line end in '\n' and might fail if this is not the case
+//NOTE: this assumes line ends with '\n' and might fail if this is not the case
 size_t normalizeLineEnding(char *line, size_t len) {
 	if(len > 1 && line[len - 2] == '\r') {
 		line[len - 2] = '\n';
@@ -15,14 +15,8 @@ size_t normalizeLineEnding(char *line, size_t len) {
 	return len;
 }
 
-
-//TODO: should I treat repeated header names as an error?
 //A sender MUST NOT generate multiple header fields with the same field name
-//A recipient MAY combine multiple header fields with the same field name into
-//one "field-name: field-value" pair by appending folling field values
-//seperating with commas. Only problem is this does not work for cookies
-//because they use ';' as seperator)
-//see: https://arxiv.org/pdf/cs/0105018v1.pdf Appendix 2.3
+//A recipient MAY combine multiple header fields with the same field name
 HeaderMap parseHeaders(Connection& c, char *buf, size_t BUF_SIZE) {
 	HeaderMap hm;
 	
@@ -97,13 +91,20 @@ size_t sendChunked(Connection& c, const char *buf, size_t len,
 		total += snprintf(lb, 16, "%X\r\n", curLen);
 		c.sendLine(lb, false);
 		c.send(buf, curLen);
+
 		buf += curLen;
 		len -= curLen;
+
+		c.sendChar('\r');
+		c.sendChar('\n');
+		total += 2;
 	}
 	c.sendLine("0\r\n", false);
 	total += 3;
 	if(trailers) {
 		//TODO: check for illegal trailer headers
+		//NOTE: from what I have read, not very many clients support trailers
+		//	so this is probably a waste of time
 		total += sendHeaders(c, *trailers);
 	} else {
 		// send final CRLF
@@ -111,6 +112,78 @@ size_t sendChunked(Connection& c, const char *buf, size_t len,
 		c.sendChar('\n');
 	}
 	return total;
+}
+
+//lines must end in a newline
+//return -1 if line does not start with valid hex digits
+int parseChunkLen(const char *line) {
+	int n = 0;
+	if(!isxdigit(*line)) return -1;
+	do {
+		n <<= 4;
+		n += decodeHexChar(*line++);
+		//does not detect overflow
+	} while(isxdigit(*line));
+	return n;
+}
+
+//takes connection and a buffer to read lines into
+//returns pointer to decoded chunked body + size of body
+ChunkPair parseChunked(Connection& c, char *buf, size_t BUF_SIZE) {
+	size_t totalLength = 0;
+	size_t len;
+
+	//use unique_ptr so that if there is an exception, chunks get freed
+	list<ChunkPair> chunks;
+	//for each chunk
+	while(true) {
+		len = c.readLine(buf, BUF_SIZE);
+
+		//check that an actual line was read
+		if(len == 0 || buf[len - 1] != '\n') throw HTTPError(400);
+
+		//get chunk length (and ignore extensions)
+		int chunkLen = parseChunkLen(buf);
+		if(chunkLen == -1) throw HTTPError(400);
+		if(chunkLen == 0) break;
+
+		//make space for chunk
+		char *chunk = new char[chunkLen];
+		try {
+			//read chunk
+			if(c.read(chunk, chunkLen) != (size_t)chunkLen) {
+				//handle case where we don't get full chunks worth
+				//TODO: clean this part up
+				throw std::exception();
+			}
+			totalLength += (size_t)chunkLen;
+		} catch(std::exception &e) {
+			//make sure to clean up
+			delete[] chunk;
+			throw e;
+		}
+		chunks.push_back(make_pair(unique_ptr<char[]>(chunk), (size_t)chunkLen));
+		chunk = nullptr;
+
+		//TODO: write a read CRLF function
+		len = c.readLine(buf, BUF_SIZE);
+
+		len = normalizeLineEnding(buf, len);
+		if(strcmp("\n", buf)) throw HTTPError(400);
+	}
+
+	//Ignore trailers for now
+	parseHeaders(c, buf, BUF_SIZE);
+
+	//merge chunks into contiguous block
+	char* body = new char[totalLength]; //NOTE: should work even if length is 0
+	size_t cur = 0;
+	for(auto &i : chunks) {
+		memcpy(body + cur, i.first.get(), i.second);
+		cur += i.second;
+	}
+	assert(cur == totalLength);
+	return make_pair(unique_ptr<char[]>(body), totalLength);
 }
 
 //HTTP-name = %x48.54.54.50 ; HTTP

@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cassert>
+#include <cctype>
 #include "HTTP.hpp"
 
 using namespace std;
@@ -95,6 +96,49 @@ void test_sendChunked() {
 	c.close();
 }
 
+void test_parseChunkLen() {
+	//test on invalid
+	assert(parseChunkLen("\n") == -1);
+	assert(parseChunkLen("ssfda\n") == -1);
+	assert(parseChunkLen(" AF\n") == -1);
+	assert(parseChunkLen(" AF\r\n") == -1);
+
+	//test on plain chunk lines
+	assert(parseChunkLen("AF\r\n") == 0xAF);
+	assert(parseChunkLen("123\r\n") == 0x123);
+	assert(parseChunkLen("123\n") == 0x123);
+
+	//test with chunk extensions (yes I know these are invalid chunk extensions,
+	//but they can be ignored so who cares)
+	assert(parseChunkLen("123sfs f kas;\n") == 0x123);
+	assert(parseChunkLen("AFsfs f kas;\n") == 0xAF);
+}
+
+void test_parseChunked() {
+	while(true) {
+		try {
+			Connection c("localhost", 1234);
+			char buf[1024];
+			auto res = parseChunked(c, buf, 1024);
+
+			cout << "read " << res.second << " bytes " << endl;
+			for(size_t i = 0; i < res.second; ++i) {
+				if(isgraph(res.first[i])) {
+					cout << res.first[i];
+				} else {
+					cout << '.';
+				}
+				if(i % 40) cout << endl;
+			}
+			cout << endl;
+		} catch(HTTPError &e) {
+			cout << "HTTPError" << endl;
+		} catch(ReadError &e) {
+			cout << "ReadError" << endl;
+		}
+	}
+}
+
 int main() {
 	cout << "Starting HTTP tests ..." << endl;
 	test_normalizeLineEnding();
@@ -102,6 +146,8 @@ int main() {
 	test_parseVersion();
 	test_client_connection_mangament();
 //	test_get();
-	test_sendChunked();
+//	test_sendChunked();
+	test_parseChunkLen();
+	test_parseChunked();
 	return 0;
 }

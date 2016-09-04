@@ -112,8 +112,7 @@ size_t Connection::read(char *buf, size_t n) {
 	while(n >= BUF_SIZE) {
 		ssize_t len = recv(fd, cur, BUF_SIZE, 0);
 		if(len < 0) {
-			//TODO: remove me
-			cout << strerror(errno) << endl;
+			//cout << strerror(errno) << endl;
 			throw ReadError();
 		}
 		//early eof
@@ -129,8 +128,7 @@ size_t Connection::read(char *buf, size_t n) {
 		rsize = recv(fd, rpos, BUF_SIZE, 0);
 		if(rsize < 0) {
 			rsize = 0;
-			//TODO: remove me
-			cout << strerror(errno) << endl;
+			//cout << strerror(errno) << endl;
 			throw ReadError();
 		}
 		if(rsize == 0) {
