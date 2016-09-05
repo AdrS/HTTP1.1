@@ -2,6 +2,63 @@
 
 using std::string; using std::min; using std::pair; using std::unique_ptr; using std::list;
 
+const char* INFO[] = {
+/*100*/ "Continue",
+/*101*/ "Switching Protocols"
+};
+
+const char *SUCCESS[] = {
+/*200*/ "OK",
+/*201*/ "Created",
+/*202*/ "Accepted",
+/*203*/ "Non-Authoritative Information",
+/*204*/ "No Content",
+/*205*/ "Reset Content",
+/*206*/ "Partial Content"
+};
+
+const char *REDIRECTION[] = {
+/*300*/ "Multiple Choices",
+/*301*/ "Moved Permanently",
+/*302*/ "Found",
+/*303*/ "See Other",
+/*304*/ "Not Modified",
+/*305*/ "Use Proxy",
+		"Switch Proxy",	//No longer used
+/*307*/ "Temporary Redirect"
+};
+
+const char *CLIENT_ERROR[] = {
+/*400*/ "Bad Request",
+/*401*/ "Unauthorized",
+/*402*/ "Payment Required",
+/*403*/ "Forbidden",
+/*404*/ "Not Found",
+/*405*/ "Method Not Allowed",
+/*406*/ "Not Acceptable",
+/*407*/ "Proxy Authentication Required",
+/*408*/ "Request Time-out",
+/*409*/ "Conflict",
+/*410*/ "Gone",
+/*411*/ "Length Required",
+/*412*/ "Precondition Failed",
+/*413*/ "Request Entity Too Large",
+/*414*/ "Request-URI Too Large",
+/*415*/ "Unsupported Media Type",
+/*416*/ "Requested range not satisfiable",
+/*417*/ "Expectation Failed",
+/*418*/ "I'm a teapot"
+};
+
+const char *SERVER_ERROR[] = {
+/*500*/ "Internal Server Error",
+/*501*/ "Not Implemented",
+/*502*/ "Bad Gateway",
+/*503*/ "Service Unavailable",
+/*504*/ "Gateway Time-out",
+/*505*/ "HTTP Version not supported"
+};
+
 const size_t Client::BUF_SIZE;
 const size_t ClientConnection::BUF_SIZE;
 
@@ -13,29 +70,6 @@ size_t normalizeLineEnding(char *line, size_t len) {
 		return len - 1;
 	}
 	return len;
-}
-
-//WARNING: when sending OPTIONS * HTTP/1.1\r\n, DO NOT URL ENCODE TARGET
-//sends request line for given target (percent encodes first by default)
-size_t sendRequestLine(Connection& c, const string& method, const string& target, bool encode) {
-	//request-line   = method SP request-target SP HTTP-version CRLF
-	size_t totalLen = 0;
-
-	totalLen += c.send(method.c_str(), method.length());
-	c.sendChar(' ');
-
-	//handle percent encoding
-	if(encode) {
-		size_t peLen = 3*target.length() + 1;
-		unique_ptr<char[]> peTarget(new char[peLen]);
-		peLen = percentEncode(target.c_str(), peTarget.get(), target.length(), peLen);
-
-		totalLen += c.send(peTarget.get(), peLen);
-	} else {
-		totalLen += c.send(target.c_str(), target.length());
-	}
-	c.sendLine(" HTTP/1.1\r\n", false);
-	return totalLen + 12;
 }
 
 //A sender MUST NOT generate multiple header fields with the same field name
@@ -122,7 +156,7 @@ size_t sendChunked(Connection& c, const char *buf, size_t len,
 		c.sendChar('\n');
 		total += 2;
 	}
-	c.sendLine("0\r\n", false);
+	c.send("0\r\n", 3);
 	total += 3;
 	if(trailers) {
 		//TODO: check for illegal trailer headers
@@ -256,6 +290,29 @@ void Client::reconnect(const std::string& host, int port) {
 	con.connect(this->host.c_str(), port);
 }
 
+//WARNING: when sending OPTIONS * HTTP/1.1\r\n, DO NOT URL ENCODE TARGET
+//sends request line for given target (percent encodes first by default)
+size_t Client::sendRequestLine(const string& method, const string& target, bool encode) {
+	//request-line   = method SP request-target SP HTTP-version CRLF
+	size_t totalLen = 0;
+
+	totalLen += con.send(method.c_str(), method.length());
+	con.sendChar(' ');
+
+	//handle percent encoding
+	if(encode) {
+		size_t peLen = 3*target.length() + 1;
+		unique_ptr<char[]> peTarget(new char[peLen]);
+		peLen = percentEncode(target.c_str(), peTarget.get(), target.length(), peLen);
+
+		totalLen += con.send(peTarget.get(), peLen);
+	} else {
+		totalLen += con.send(target.c_str(), target.length());
+	}
+	con.sendLine(" HTTP/1.1\r\n", false);
+	return totalLen + 12;
+}
+
 //DO remember to send Host header first (do no keep it in HeaderMap)
 //all the methods
 Reply Client::get(const std::string& target) {
@@ -304,3 +361,59 @@ Reply Client::options() {
 
 ////////////////////SERVER CODE//////////////////////
 ClientConnection::ClientConnection(int fd) : con(fd), keepAlive(true) {}
+
+//close connection with client
+void ClientConnection::close() {
+	con.close();
+}
+
+//reuse object for new client connection
+void ClientConnection::reuse(int fd) {
+	//reset options
+	keepAlive = true;
+	con.connect(fd);
+}
+
+//reason phrase should consists only of tabs, spaces, and visible characters
+//in particular it should have no newlines or carriage returns
+void ClientConnection::sendStatusLine(int status, const char* reason) {
+	if(status < 100 || status > 599) throw std::exception();
+	//reason-phrase  = *( HTAB / SP / VCHAR / obs-text )
+	char buf[14];
+	snprintf(buf, 14, "HTTP/1.1 %d ", status);
+	con.send(buf, 13);
+	con.sendLine(reason, true, true);
+}
+
+const char *reasonPhrase(int status) {
+	size_t es = sizeof(INFO[0]);
+	if(status < 100) return nullptr;
+
+	size_t s = (size_t)status; //to suppress signed unsigned comparison warnings
+
+	//if in lookup table => return it
+	//otherwise default to x00 reason phrase
+
+	//1xx: Informational
+	if(s < 100 + sizeof(INFO)/es) return INFO[s - 100];
+	if(s < 200) return INFO[0];
+	//2xx: Success
+	if(s < 200 + sizeof(SUCCESS)/es) return SUCCESS[s - 200];
+	if(s < 300) return SUCCESS[0];
+	//3xx: Redirection
+	if(s < 300 + sizeof(REDIRECTION)/es) return REDIRECTION[s - 300];
+	if(s < 400) return REDIRECTION[0];
+	//4xx: Client Error
+	if(s < 400 + sizeof(CLIENT_ERROR)/es) return CLIENT_ERROR[s - 400];
+	if(s < 500) return CLIENT_ERROR[0];
+	//5xx: Server Error
+	if(s < 500 + sizeof(SERVER_ERROR)/es) return SERVER_ERROR[s - 500];
+	if(s < 600) return SERVER_ERROR[0];
+
+	return nullptr;
+}
+
+//same as above, except default reason phrases are used
+void ClientConnection::sendStatusLine(int status) {
+	sendStatusLine(status, reasonPhrase(status));
+}

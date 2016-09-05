@@ -41,14 +41,15 @@ class Connection {
 	//this does the work of setting up connections for the
 	//constructor and reconnect
 	void setupConnection(const char* host, int port);
+	void setupConnection(int fd);
 public:
-	//
 	Connection(const char* host, int port);
 	//takes the file descriptor of the existing socket to wrap
 	Connection(int fd);
 	~Connection();
 	//close existing connection and open a new one
 	void connect(const char* host, int port);
+	void connect(int fd);
 	char readChar();
 	size_t read(char *buf, size_t n);
 	//returns true if internal read buffer still has data
@@ -61,7 +62,8 @@ public:
 	//successfully sent
 	size_t send(const char *buf, size_t n);
 	//writes line to connection. Unless addNewline is false, a newline is appended
-	void sendLine(const char* line, bool addNewline = true);
+	//use crlf option to specify type of newline sent
+	void sendLine(const char* line, bool addNewline = true, bool crlf = false);
 	//flushes the send buffer
 	void flush();
 	//closes the underlying connection

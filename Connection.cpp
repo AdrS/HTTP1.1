@@ -46,13 +46,9 @@ void Connection::setupConnection(const char* host, int port) {
 	}
 }
 
-Connection::Connection(const char* host, int port) : fd(-1), rsize(0),
-		rpos(readBuf), wleft(BUF_SIZE), wpos(writeBuf) {
-	setupConnection(host, port);
-}
+void Connection::setupConnection(int fd) {
+	//see note for other setupConnection
 
-Connection::Connection(int fd) : fd(fd), rsize(0), rpos(readBuf), wleft(BUF_SIZE),
-															wpos(writeBuf) {
 	//verify that file descriptor is for a socket
 	struct stat statbuf;
 	if(fstat(fd, &statbuf) == -1 || !S_ISSOCK(statbuf.st_mode)) {
@@ -61,10 +57,25 @@ Connection::Connection(int fd) : fd(fd), rsize(0), rpos(readBuf), wleft(BUF_SIZE
 	}
 }
 
+Connection::Connection(const char* host, int port) : fd(-1), rsize(0),
+		rpos(readBuf), wleft(BUF_SIZE), wpos(writeBuf) {
+	setupConnection(host, port);
+}
+
+Connection::Connection(int fd) : fd(fd), rsize(0), rpos(readBuf), wleft(BUF_SIZE),
+															wpos(writeBuf) {
+	setupConnection(fd);
+}
+
 //close existing connection and open a new one
 void Connection::connect(const char* host, int port) {
 	close();
 	setupConnection(host, port);
+}
+
+void Connection::connect(int fd) {
+	close();
+	setupConnection(fd);
 }
 
 Connection::~Connection() {
@@ -217,9 +228,10 @@ size_t Connection::send(const char *buf, size_t n) {
 	return total_len;
 }
 
-void Connection::sendLine(const char* line, bool addNewline) {
+void Connection::sendLine(const char* line, bool addNewline, bool crlf) {
 	send(line, strlen(line));
 	if(addNewline) {
+		if(crlf) sendChar('\r');
 		sendChar('\n');
 	}
 }
@@ -242,7 +254,7 @@ void Connection::close() {
 		//TODO: handle errors
 		::close(fd);
 	}
-	//prevent accidental use after closing
+	//prevent accidental use after closing/reset state
 	fd = -1;
 	rsize = 0;
 	rpos = readBuf;

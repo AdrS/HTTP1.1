@@ -1,9 +1,53 @@
 #include <iostream>
 #include <cassert>
 #include <cctype>
+#include <utility>
 #include "HTTP.hpp"
 
 using namespace std;
+
+//TODO: THIS is duplicated code :(
+int openTCP(const char *host, int port) {
+	//do domain name lookup
+	addrinfo hints;
+	addrinfo *res, *rp;
+	int fd;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;	//Want IPv4 or IPv6
+	hints.ai_socktype = SOCK_STREAM;//Want TCP
+	//all other options are set to default (because of the memset)
+
+	if(getaddrinfo(host, nullptr, &hints, &res)) {
+		//TODO: add more details to exception, see gai_strerror()
+		throw NameResolutionError();
+	}
+
+	//try connecting to the returned addresses
+	for(rp = res; rp != nullptr; rp = rp->ai_next) {
+		fd = socket(rp->ai_family, SOCK_STREAM , rp->ai_protocol);
+		//fill out port (TODO: could have just filled out the serv param to
+		//					getaddrinfo)
+		if(rp->ai_family == AF_INET) {
+			sockaddr_in* addr = reinterpret_cast<sockaddr_in*>(rp->ai_addr);
+			addr->sin_port = htons(port);
+		} else {
+			sockaddr_in6* addr = reinterpret_cast<sockaddr_in6*>(rp->ai_addr);
+			addr->sin6_port = htons(port);
+		}
+		if(fd == -1) continue;
+		if(::connect(fd, rp->ai_addr, rp->ai_addrlen) == 0) break;
+	}
+
+	//getting to the end of the list means no connection could be made
+	if(rp == nullptr) {
+		fd = -1;
+		throw ConnectionEstablishmentError();
+	}
+
+	freeaddrinfo(res);
+	return fd;
+}
 
 void test_normalizeLineEnding() {
 	char buf[1024];
@@ -145,6 +189,7 @@ struct RL_case {
 	bool pe;
 };
 void test_sendRequestLine() {
+	/* method this is testing is private now
 	RL_case tests[] = {
 		{"GET", "\x7\x1\x1/index.html", true},
 		{"GET", "/index.html", true},
@@ -161,13 +206,43 @@ void test_sendRequestLine() {
 		cout << "Next? ";
 		cin >> next;
 		try {
-			Connection c("localhost", 1234);
-			sendRequestLine(c, tests[i].method, tests[i].target, tests[i].pe);
-			c.close();
+			Client c("localhost", 1234);
+			c.sendRequestLine(tests[i].method, tests[i].target, tests[i].pe);
+			c.disconnect();
 		} catch (...) {
 			cout << "Error" << endl;
 		}
+	} */
+}
+
+void test_reasonPhrase() {
+	//check that defaulting to x00 works
+	assert(INFO[0] == reasonPhrase(199));
+	assert(SUCCESS[0] == reasonPhrase(299));
+	assert(REDIRECTION[0] == reasonPhrase(399));
+	assert(CLIENT_ERROR[0] == reasonPhrase(499));
+	assert(SERVER_ERROR[0] == reasonPhrase(599));
+
+	assert(!reasonPhrase(99));
+	assert(!reasonPhrase(600));
+
+	assert(INFO[1] == reasonPhrase(101));
+	assert(SUCCESS[4] == reasonPhrase(204));
+	assert(REDIRECTION[3] == reasonPhrase(303));
+	assert(CLIENT_ERROR[14] == reasonPhrase(414));
+	assert(SERVER_ERROR[0] == reasonPhrase(500));
+}
+
+void test_sendStatusLine() {
+	//writing move did not work
+	ClientConnection c(openTCP("localhost",1234));
+	try {
+		c.sendStatusLine(900, "yoyo");
+		assert(false);
+	} catch(exception &e) {
 	}
+	c.sendStatusLine(123, "My custom reason phrase");
+	c.sendStatusLine(404);
 }
 
 int main() {
@@ -181,5 +256,7 @@ int main() {
 	test_parseChunkLen();
 //	test_parseChunked();
 	test_sendRequestLine();
+	test_reasonPhrase();
+	test_sendStatusLine();
 	return 0;
 }

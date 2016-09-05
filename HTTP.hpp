@@ -13,9 +13,6 @@
 #include "HeaderMap.hpp"
 #include "URL.hpp"
 
-//replaces CRLF at end of line (if present) with LF '\0' and returns new length
-size_t normalizeLineEnding(char *line, size_t len);
-
 //TODO: make exceptions for HTTP errors have reason string
 //	ex: "headers too long"
 class HTTPError : std::exception {
@@ -24,10 +21,8 @@ public:
 	const int status;
 };
 
-//sends request line for given target (percent encodes first by default)
-//WARNING: when sending OPTIONS * HTTP/1.1\r\n, SET ENCODE TO FALSE
-size_t sendRequestLine(Connection& c, const std::string& method,
-	const std::string& target, bool encode = true);
+//replaces CRLF at end of line (if present) with LF '\0' and returns new length
+size_t normalizeLineEnding(char *line, size_t len);
 
 //send headers across connection followed by final empty line (CRLF)
 size_t sendHeaders(Connection& c, const HeaderMap& headers);
@@ -84,9 +79,15 @@ class Client {
 	int port;
 	Connection con;
 	bool keepAlive;
+
 	//implement these later
 	Client(const Client&);
 	const Client& operator=(const Client&);
+
+	//sends request line for given target (percent encodes first by default)
+	//WARNING: when sending OPTIONS * HTTP/1.1\r\n, SET ENCODE TO FALSE
+	size_t sendRequestLine(const std::string& method,
+		const std::string& target, bool encode = true);
 public:
 	HeaderMap headers;
 	//create TCP connection to host:port
@@ -118,7 +119,25 @@ class ClientConnection {
 	Connection con;
 	bool keepAlive;
 public:
+	void sendStatusLine(int status, const char* reason);
+	//same as above, except default reason phrases are used
+	void sendStatusLine(int status);
+
 	ClientConnection(int fd);
+	//close connection with client
+	void close();
+	//reuse object for new client connection
+	void reuse(int fd);
 };
+
+
+extern const char *INFO[];
+extern const char *SUCCESS[];
+extern const char *REDIRECTION[];
+extern const char *CLIENT_ERROR[];
+extern const char *SERVER_ERROR[];
+
+//returns correct reason phrase for status code
+const char *reasonPhrase(int status);
 
 #endif
