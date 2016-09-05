@@ -244,19 +244,6 @@ ChunkPair parseChunked(Connection& c, char *buf, size_t BUF_SIZE) {
 	return make_pair(unique_ptr<char[]>(body), totalLength);
 }
 
-//HTTP-name = %x48.54.54.50 ; HTTP
-//HTTP-version = HTTP-name "/" DIGIT "." DIGIT
-//parsers http version string ie; "HTTP/x.x", raises exception if invalid
-void parseVersion(char *vs, int& major, int& minor) {
-	size_t l = strlen(vs);
-	if(l != 8) throw HTTPError(400);
-	major = vs[5] - '0';
-	minor = vs[7] - '0';
-	if(major > 9 || minor > 9) throw HTTPError(400);
-	vs[5] = vs[7] = 'x';
-	if(strcmp(vs, "HTTP/x.x")) throw HTTPError(400);
-}
-
 Reply::Reply(int status, const HeaderMap& headers): body(nullptr), length(0),
 		status(status), headers(headers) {
 	assert(status >= 100 && status <= 599);
@@ -311,6 +298,34 @@ size_t Client::sendRequestLine(const string& method, const string& target, bool 
 	}
 	con.sendLine(" HTTP/1.1\r\n", false);
 	return totalLen + 12;
+}
+
+//read status line and returns status code
+int Client::parseStatusLine() {
+	string s;
+	return parseStatusLine(s);
+}
+
+//read status line and returns status code and reasonPhrase
+int Client::parseStatusLine(std::string& reasonPhrase) {
+	size_t len = con.readLine(buf, BUF_SIZE);
+	//check that an actual line was read
+	if(len == 0 || buf[len - 1] != '\n') throw HTTPError(400);
+	len = normalizeLineEnding(buf, len);
+
+	//check that version is HTTP/1.1
+	if(strncmp("HTTP/1.1 ", buf, 9)) throw HTTPError(400);
+
+	//get status
+	int status = atoi(buf + 9);
+	if(status < 100 || status > 599) throw HTTPError(400);
+
+	//there should be space between status and reason phrase
+	if(buf[12] != ' ') throw HTTPError(400);
+
+	//rest of line is reason phrase (except newline)
+	reasonPhrase = string(buf + 13, buf + len - 1);
+	return status;
 }
 
 //DO remember to send Host header first (do no keep it in HeaderMap)
