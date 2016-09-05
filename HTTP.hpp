@@ -24,6 +24,9 @@ public:
 //replaces CRLF at end of line (if present) with LF '\0' and returns new length
 size_t normalizeLineEnding(char *line, size_t len);
 
+//sends a single header (DOES NOT VALIDATE parameters)
+size_t sendHeader(Connection& c, const std::string& name, const std::string& value);
+
 //send headers across connection followed by final empty line (CRLF)
 size_t sendHeaders(Connection& c, const HeaderMap& headers);
 

@@ -118,20 +118,26 @@ HeaderMap parseHeaders(Connection& c, char *buf, size_t BUF_SIZE) {
 	return hm;
 }
 
+//sends a single header
+size_t sendHeader(Connection& c, const string& name, const string& value) {
+	size_t len = 0;
+		len += c.send(name.c_str(), name.length());
+
+		c.sendChar(':');
+
+		len += c.send(value.c_str(), value.length());
+		c.sendChar('\r');
+		c.sendChar('\n');
+
+		return len + 3;
+}
+
 //TODO: make final CRLF optional
 //send headers across connection followed by final empty line (CRLF)
 size_t sendHeaders(Connection& c, const HeaderMap& headers) {
 	size_t len = 0;
 	for(auto &h : headers) {
-		len += c.send(h.first.c_str(), h.first.length());
-
-		c.sendChar(':');
-
-		len += c.send(h.second.c_str(), h.second.length());
-		c.sendChar('\r');
-		c.sendChar('\n');
-
-		len += 3;
+		len += sendHeader(c, h.first, h.second);
 	}
 	//send final CRLF to signal end of headers
 	c.sendChar('\r');
@@ -331,41 +337,47 @@ int Client::parseStatusLine(std::string& reasonPhrase) {
 //DO remember to send Host header first (do no keep it in HeaderMap)
 //all the methods
 Reply Client::get(const std::string& target) {
-	con.send("GET ",4);
-
-	//TODO: lots of overlap with all the other method code
-	con.send(target.c_str(), target.length());
-	con.send(" HTTP/1.1\r\n", 11);
-	//send host header first
-	con.send("Host:", 5);
-	con.send(host.c_str(), host.length());
-	con.send("\r\n", 2);
-
-	//send rest of headers (I assume host is not in this list)
-	sendHeaders(con, headers);
+	sendRequestLine("GET", target);
+	sendHeader(con, "Host", host); //send host header first
+	sendHeaders(con, headers); //send rest of headers TODO: make sure host is not one)
 	con.flush();
-
 	
-	//parse status line
-	con.readLine(buf, BUF_SIZE);
-
-	//parse headers
+	int status = parseStatusLine();
 	HeaderMap replyHeaders = parseHeaders(con, buf, BUF_SIZE);
 
-	//get body
-	return Reply(400, replyHeaders);
+	//if(status < 200 || status == 204 || status == 304) //then no body (regardless of headers)
+	//else get body
+	return Reply(status, replyHeaders);
 }
 
 Reply Client::head(const std::string& target) {
-	return Reply(400, HeaderMap());
+	sendRequestLine("HEAD", target);
+	sendHeader(con, "Host", host);
+	sendHeaders(con, headers);
+	con.flush();
+	
+	int status = parseStatusLine();
+	//there never will be a body for head request
+	return Reply(status, parseHeaders(con, buf, BUF_SIZE));
 }
 
 Reply Client::post(const std::string& target, char *body, size_t length) {
-	return Reply(400, HeaderMap());
+	sendRequestLine("POST", target);
+	sendHeader(con, "Host", host);
+	sendHeaders(con, headers);
+	//TODO: send body
+	con.flush();
+	
+	int status = parseStatusLine();
+	HeaderMap replyHeaders = parseHeaders(con, buf, BUF_SIZE);
+	//if(status < 200 || status == 204 || status == 304) //then no body (regardless of headers)
+	//else get body
+	return Reply(status, HeaderMap());
 }
 
 //fetch options for a specific target
 Reply Client::options(const std::string& target) {
+	//If target == "*" then do not encode it
 	return Reply(400, HeaderMap());
 }
 
@@ -459,4 +471,5 @@ void ClientConnection::parseRequestLine(string& method, string& target) {
 
 	//check that version is HTTP/1.1
 	if(strcmp("HTTP/1.1\n", pos)) throw HTTPError(400);
+	//TODO: should use 505 Version Not Supported
 }

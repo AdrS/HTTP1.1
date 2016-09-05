@@ -87,14 +87,25 @@ void test_parseHeaders() {
 void test_client_connection_mangament() {
 }
 
-void test_get() {
-	Client c("localhost", 1234);
-	c.headers.insert("Cookie", "uid=1234");
-	c.headers.insert("User-Agent", "Adrian's HTTP client");
-	Reply r = c.get("/");
-	cout << "Status: " << r.status << endl;
-	for(auto &i : r.headers) {
-		cout << i.first << ": " << i.second << endl;
+void test_head() {
+	while(true) {
+		string host;
+		string target;
+		cout << "Enter host and target: ";
+		cin >> host >> target;
+		try {
+			Client c(host);
+			c.headers.insert("Cookie", "uid=1234");
+			c.headers.insert("User-Agent", "Adrian's HTTP client");
+			c.headers.insert("Connection", "close");
+			Reply r = c.head(target);
+			cout << "Status: " << r.status << endl;
+			for(auto &i : r.headers) {
+				cout << i.first << ": " << i.second << endl;
+			}
+		} catch(...) {
+			cout << "Some error" << endl;
+		}
 	}
 }
 
@@ -254,7 +265,7 @@ int main() {
 	test_normalizeLineEnding();
 //	test_parseHeaders();
 	test_client_connection_mangament();
-//	test_get();
+	test_head();
 //	test_sendChunked();
 	test_parseChunkLen();
 //	test_parseChunked();
@@ -262,6 +273,6 @@ int main() {
 	test_reasonPhrase();
 //	test_sendStatusLine();
 //	test_parseStatusLine();
-	test_parseRequestLine();
+//	test_parseRequestLine();
 	return 0;
 }
