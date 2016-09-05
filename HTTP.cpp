@@ -432,3 +432,31 @@ const char *reasonPhrase(int status) {
 void ClientConnection::sendStatusLine(int status) {
 	sendStatusLine(status, reasonPhrase(status));
 }
+
+//reads request line and parses method and target
+void ClientConnection::parseRequestLine(string& method, string& target) {
+	size_t len = con.readLine(buf, BUF_SIZE);
+	//check that an actual line was read
+	if(len == 0 || buf[len - 1] != '\n') throw HTTPError(400);
+	len = normalizeLineEnding(buf, len);
+
+	char *pos = buf;
+	//parse method
+	while(*pos != ' ' && *pos != '\n') ++pos;
+	if(*pos == '\n') throw HTTPError(400); 	//method takes up whole line
+	*pos++ = '\0';
+	method = string(buf);
+
+	//parse target
+	char *tstart = pos;
+	while(*pos != ' ' && *pos != '\n') ++pos;
+	if(*pos == '\n') throw HTTPError(400);
+	*pos++ = '\0';
+
+	//decode target
+	size_t tlen = percentDecode(tstart);
+	target = string(tstart, tlen);
+
+	//check that version is HTTP/1.1
+	if(strcmp("HTTP/1.1\n", pos)) throw HTTPError(400);
+}

@@ -228,6 +228,27 @@ void test_parseStatusLine() {
 	}
 }
 
+void test_parseRequestLine() {
+	while(true) {
+		try {
+			ClientConnection c(openTCP("localhost",1234));
+			string method;
+			string target;
+			c.parseRequestLine(method, target);
+			cout << method << " \"";
+			for(auto &c : target) {
+				if(isgraph(c)) cout << c;
+				else cout << "\\x" << hex << (int)c << dec;
+			}
+			cout << "\"" << endl;
+		} catch(HTTPError &e) {
+			cout << "HTTPError " << e.status << endl;
+		} catch(InvalidPercentEncoding &e) {
+			cout << "Invalid percent encoding" << endl;
+		}
+	}
+}
+
 int main() {
 	cout << "Starting HTTP tests ..." << endl;
 	test_normalizeLineEnding();
@@ -240,6 +261,7 @@ int main() {
 	test_sendRequestLine();
 	test_reasonPhrase();
 //	test_sendStatusLine();
-	test_parseStatusLine();
+//	test_parseStatusLine();
+	test_parseRequestLine();
 	return 0;
 }

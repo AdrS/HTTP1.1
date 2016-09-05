@@ -51,10 +51,6 @@ ChunkPair parseChunked(Connection& c, char *buf, size_t BUF_SIZE);
 //NOTE: if Connection: close, then server does not have to send Content-Length and
 //	can signal end of payload by closing connection
 
-//parsers http version string ie; HTTP/x.x
-//NOTE: this function modifies the string
-void parseVersion(char *vs, int& major, int& minor);
-
 class Reply {
 	char *body;	//TODO: does unique_ptr make more sense?
 	size_t length;
@@ -63,6 +59,7 @@ class Reply {
 	const Reply& operator=(const Reply&);
 public:
 	int status;
+	std::string reason;
 	HeaderMap headers;
 
 	Reply(int status, const HeaderMap& headers);
@@ -89,6 +86,11 @@ class Client {
 	size_t sendRequestLine(const std::string& method,
 		const std::string& target, bool encode = true);
 public:
+	//read status line and returns status code
+	int parseStatusLine();
+	//read status line and returns status code and reasonPhrase
+	int parseStatusLine(std::string& reasonPhrase);
+
 	HeaderMap headers;
 	//create TCP connection to host:port
 	Client(const std::string& host, int port = 80);
@@ -122,6 +124,9 @@ public:
 	void sendStatusLine(int status, const char* reason);
 	//same as above, except default reason phrases are used
 	void sendStatusLine(int status);
+	
+	//reads request line and parses method and target
+	void parseRequestLine(std::string& method, std::string& target);
 
 	ClientConnection(int fd);
 	//close connection with client

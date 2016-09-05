@@ -28,7 +28,8 @@ class InvalidPercentEncoding : std::exception {};
 class InvalidHexChar : std::exception {};
 
 //percent decodes all characters and returns new size
-//Note: because %00 could be in the string, null termination is cannot be used
+//Note: because %00 could be in the string, null termination cannot be used
+//	after decoding, so size is returned
 //throws error on invalid percent encoding
 size_t percentDecode(char *str);
 
