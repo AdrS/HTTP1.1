@@ -153,7 +153,7 @@ void test_parseChunked() {
 				} else {
 					cout << '.';
 				}
-				if(i % 40) cout << endl;
+				if(i % 40 == 39) cout << endl;
 			}
 			cout << endl;
 		} catch(HTTPError &e) {
@@ -260,12 +260,77 @@ void test_parseRequestLine() {
 	}
 }
 
+void test_get() {
+	while(true) {
+		string host;
+		string target;
+		cout << "Enter host and target: ";
+		cin >> host >> target;
+		try {
+			Client c(host);
+			c.headers.insert("User-Agent", "Adrian's HTTP client");
+			c.headers.insert("Connection", "close");
+			Reply r = c.get(target);
+			cout << "Status: " << r.status << endl;
+			for(auto &i : r.headers) {
+				cout << i.first << ": " << i.second << endl;
+			}
+			if(r.length) {
+				cout << "Body: " << endl;
+				for(size_t i = 0; i < r.length; ++i) {
+					char c = r.body[i];
+					if(isgraph(c)) cout << c;
+					else cout << "\\x" << hex << (int)c << dec;
+				}
+			} else {
+				cout << "No body" << endl;
+			}
+			cout << "==================================================" << endl;
+		} catch(...) {
+			cout << "Some error" << endl;
+		}
+	}
+}
+
+void test_post() {
+	while(true) {
+		string host;
+		string target;
+		string payload;
+		cout << "Enter host, target, payload: ";
+		cin >> host >> target >> payload;
+		try {
+			Client c(host);
+			c.headers.insert("User-Agent", "Adrian's HTTP client");
+			c.headers.insert("Connection", "close");
+			Reply r = c.post(target, payload.c_str(), payload.length());
+			cout << "Status: " << r.status << endl;
+			for(auto &i : r.headers) {
+				cout << i.first << ": " << i.second << endl;
+			}
+			if(r.length) {
+				cout << "Body: " << endl;
+				for(size_t i = 0; i < r.length; ++i) {
+					char c = r.body[i];
+					if(isgraph(c)) cout << c;
+					else cout << "\\x" << hex << (int)c << dec;
+				}
+			} else {
+				cout << "No body" << endl;
+			}
+			cout << "\n==================================================" << endl;
+		} catch(...) {
+			cout << "Some error" << endl;
+		}
+	}
+}
+
 int main() {
 	cout << "Starting HTTP tests ..." << endl;
 	test_normalizeLineEnding();
 //	test_parseHeaders();
 	test_client_connection_mangament();
-	test_head();
+//	test_head();
 //	test_sendChunked();
 	test_parseChunkLen();
 //	test_parseChunked();
@@ -274,5 +339,7 @@ int main() {
 //	test_sendStatusLine();
 //	test_parseStatusLine();
 //	test_parseRequestLine();
+//	test_get();
+	test_post();
 	return 0;
 }

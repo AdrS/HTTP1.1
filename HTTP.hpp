@@ -49,23 +49,26 @@ typedef std::pair<std::unique_ptr<char[]>, size_t> ChunkPair;
 //returns pointer to decoded chunked body + size of body
 ChunkPair parseChunked(Connection& c, char *buf, size_t BUF_SIZE);
 
-//size_t sendBody(Connection& c, char *body, size_t len, bool chunked);
+//merges chunks together
+ChunkPair mergeChunks(const std::list<ChunkPair>& chunks);
 
 //NOTE: if Connection: close, then server does not have to send Content-Length and
 //	can signal end of payload by closing connection
 
 class Reply {
-	char *body;	//TODO: does unique_ptr make more sense?
-	size_t length;
 	//do not have to deal with this
 	Reply(const Reply&);
 	const Reply& operator=(const Reply&);
 public:
 	int status;
-	std::string reason;
 	HeaderMap headers;
 
+	size_t length;
+	std::unique_ptr<char[]> body;
+
+	//for replies without bodies (EX: response to HEAD)
 	Reply(int status, const HeaderMap& headers);
+	Reply(int status, const HeaderMap& headers, size_t length, std::unique_ptr<char[]>& body);
 	Reply(Reply&& r);
 };
 
@@ -94,6 +97,11 @@ public:
 	//read status line and returns status code and reasonPhrase
 	int parseStatusLine(std::string& reasonPhrase);
 
+	//TODO: add a max body length option
+	//returns body and length of body
+	//NOTE: do not call for head requests, or when status code is 1xx, 204, or 304
+	ChunkPair parseBody(const HeaderMap& replyHeaders);
+
 	HeaderMap headers;
 	//create TCP connection to host:port
 	Client(const std::string& host, int port = 80);
@@ -109,7 +117,7 @@ public:
 	//all the methods
 	Reply get(const std::string& target);
 	Reply head(const std::string& target);
-	Reply post(const std::string& target, char *body, size_t length);
+	Reply post(const std::string& target, const char *body, size_t length);
 	//fetch options for a specific target
 	Reply options(const std::string& target);
 	//fetch global options ie: "OPTIONS * HTTP/1.1\r\n"

@@ -1,6 +1,7 @@
 #include "HTTP.hpp"
 
 using std::string; using std::min; using std::pair; using std::unique_ptr; using std::list;
+using std::to_string; using std::move;
 
 const char* INFO[] = {
 /*100*/ "Continue",
@@ -193,7 +194,6 @@ int parseChunkLen(const char *line) {
 //takes connection and a buffer to read lines into
 //returns pointer to decoded chunked body + size of body
 ChunkPair parseChunked(Connection& c, char *buf, size_t BUF_SIZE) {
-	size_t totalLength = 0;
 	size_t len;
 
 	//use unique_ptr so that if there is an exception, chunks get freed
@@ -219,7 +219,6 @@ ChunkPair parseChunked(Connection& c, char *buf, size_t BUF_SIZE) {
 				//TODO: clean this part up
 				throw std::exception();
 			}
-			totalLength += (size_t)chunkLen;
 		} catch(std::exception &e) {
 			//make sure to clean up
 			delete[] chunk;
@@ -237,30 +236,24 @@ ChunkPair parseChunked(Connection& c, char *buf, size_t BUF_SIZE) {
 
 	//Ignore trailers for now
 	//TODO: should give error if trailers received when TE: trailers is not sent
+	//	better to handle elsewhere
 	parseHeaders(c, buf, BUF_SIZE);
 
-	//merge chunks into contiguous block
-	char* body = new char[totalLength]; //NOTE: should work even if length is 0
-	size_t cur = 0;
-	for(auto &i : chunks) {
-		memcpy(body + cur, i.first.get(), i.second);
-		cur += i.second;
-	}
-	assert(cur == totalLength);
-	return make_pair(unique_ptr<char[]>(body), totalLength);
+	return mergeChunks(chunks);
 }
 
-Reply::Reply(int status, const HeaderMap& headers): body(nullptr), length(0),
-		status(status), headers(headers) {
-	assert(status >= 100 && status <= 599);
-}
+Reply::Reply(int status, const HeaderMap& headers) : status(status),
+	headers(headers), length(0) {}
+
+Reply::Reply(int status, const HeaderMap& headers, size_t length,
+	unique_ptr<char[]>& body) : status(status), headers(headers), length(length),
+	body(move(body)) {}
 
 //move construtor
 Reply::Reply(Reply&& r) {
 	status = r.status;
 	headers = r.headers;
-	body = r.body;
-	r.body = nullptr;
+	body = move(r.body);
 	length = r.length;
 }
 
@@ -334,6 +327,85 @@ int Client::parseStatusLine(std::string& reasonPhrase) {
 	return status;
 }
 
+//merges chunks together
+ChunkPair mergeChunks(const std::list<ChunkPair>& chunks) {
+	//determine total size
+	size_t totalLength = 0;
+	for(auto &i : chunks) totalLength += i.second;
+
+	//merge chunks into contiguous block
+	char* body = new char[totalLength]; //NOTE: should work even if length is 0
+	size_t cur = 0;
+	for(auto &i : chunks) {
+		memcpy(body + cur, i.first.get(), i.second);
+		cur += i.second;
+	}
+	assert(cur == totalLength);	//should be unnecessary
+	return make_pair(unique_ptr<char[]>(body), totalLength);
+}
+
+//returns body and length of body
+//NOTE: do not call for head requests, or when status code is 1xx, 204, or 304
+//see: https://tools.ietf.org/html/rfc7230#section-3.3
+ChunkPair Client::parseBody(const HeaderMap& replyHeaders) {
+	//assuming response is actually allowed to have a body
+	//Transfer-Encoding takes first precedence
+	auto te = replyHeaders.find("transfer-encoding");
+	auto cl = replyHeaders.find("content-length");
+	if(te != replyHeaders.end()) {
+		//if both Transfer-Encoding and Content-Length present, reject
+		if(cl != replyHeaders.end()) throw HTTPError(500);
+
+		//transfer-coding names are case-insensitive
+		string transferCoding = lowercase(te->second);
+
+		//NOTE: I only plan to support chunked and identity
+		//if chunked is the last encoding => then use chunked encoding to determine length
+		if(transferCoding == "chunked") return parseChunked(con, buf, BUF_SIZE);
+		//not chunked or identity => unrecognized
+		if(transferCoding != "identity") throw HTTPError(500);
+		//transfer coding = identity => read til server closes (handled below)
+	}
+	//if Content-Length present, use that
+	if(cl != replyHeaders.end()) {
+		//TODO: make sure this rejects multiple content lenghths
+		//TODO: write strict parseInt
+		//parse content length
+		int tmp = std::stoi(cl->second);
+		if(tmp < 0) throw HTTPError(500);
+		//TODO: if multiple content lengths => must close connection
+		size_t contentLen= (size_t)tmp;
+
+		//read up to content length bytes
+		unique_ptr<char[]> body(new char[contentLen]);
+		size_t readLen = con.read(body.get(), contentLen);
+
+		//if body is shorter than expected
+		if(readLen != contentLen) {
+			//TODO: what to do? raise error, give warning
+			throw std::exception();
+		}
+		return make_pair(unique_ptr<char[]>(body.release()), readLen);
+	}
+	//DEFAULT (for responses) read data till server closes connection
+	list<ChunkPair> parts;
+	size_t partLen;
+	//while connection is open 
+	do {
+		char *part = new char[BUF_SIZE];
+		try {
+			//read another block
+			partLen = con.read(part, BUF_SIZE);
+			parts.push_back(make_pair(unique_ptr<char[]>(part), partLen));
+		} catch(...) {
+			delete[] part;
+			throw;
+		}
+		//shorter read => EOF => connection closed
+	} while(partLen == BUF_SIZE);
+	return mergeChunks(parts);
+}
+
 //DO remember to send Host header first (do no keep it in HeaderMap)
 //all the methods
 Reply Client::get(const std::string& target) {
@@ -345,9 +417,12 @@ Reply Client::get(const std::string& target) {
 	int status = parseStatusLine();
 	HeaderMap replyHeaders = parseHeaders(con, buf, BUF_SIZE);
 
-	//if(status < 200 || status == 204 || status == 304) //then no body (regardless of headers)
-	//else get body
-	return Reply(status, replyHeaders);
+	if(status < 200 || status == 204 || status == 304) {
+		//then no body (regardless of headers)
+		return Reply(status, replyHeaders);
+	}
+	auto body = parseBody(replyHeaders);
+	return Reply(status, replyHeaders, body.second, body.first);
 }
 
 Reply Client::head(const std::string& target) {
@@ -361,18 +436,23 @@ Reply Client::head(const std::string& target) {
 	return Reply(status, parseHeaders(con, buf, BUF_SIZE));
 }
 
-Reply Client::post(const std::string& target, char *body, size_t length) {
+Reply Client::post(const std::string& target, const char *body, size_t length) {
 	sendRequestLine("POST", target);
 	sendHeader(con, "Host", host);
-	sendHeaders(con, headers);
-	//TODO: send body
+	sendHeader(con, "Content-Length", to_string(length));
+	sendHeaders(con, headers);	//TODO: make sure this does not have host or Content-Length
+	con.send(body, length);
 	con.flush();
 	
 	int status = parseStatusLine();
 	HeaderMap replyHeaders = parseHeaders(con, buf, BUF_SIZE);
-	//if(status < 200 || status == 204 || status == 304) //then no body (regardless of headers)
-	//else get body
-	return Reply(status, HeaderMap());
+
+	if(status < 200 || status == 204 || status == 304) {
+		//then no body (regardless of headers)
+		return Reply(status, replyHeaders);
+	}
+	auto rb = parseBody(replyHeaders);
+	return Reply(status, replyHeaders, rb.second, rb.first);
 }
 
 //fetch options for a specific target

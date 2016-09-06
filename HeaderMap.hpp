@@ -40,5 +40,6 @@ public:
 };
 
 std::string capitalize(std::string s);
+std::string lowercase(std::string s);
 
 #endif

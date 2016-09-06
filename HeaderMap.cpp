@@ -20,6 +20,11 @@ string capitalize(string s) {
 	return s;
 }
 
+string lowercase(string s) {
+	for(auto &c : s) c = tolower(c);
+	return s;
+}
+
 //tchar = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+" / "-" / "." /
 //    "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
 //TODO: lookup tables would be faster (maybe)

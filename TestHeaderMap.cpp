@@ -57,6 +57,13 @@ void test_capitalize() {
 	assert(capitalize("c++1y") == "C++1Y");
 }
 
+void test_lowercase() {
+	assert(lowercase("Adrian") == "adrian");
+	assert(lowercase("adrian") == "adrian");
+	assert(lowercase("aDRian") == "adrian");
+	assert(lowercase("38 ADRIANS!!!") == "38 adrians!!!");
+}
+
 void test_insert() {
 	HeaderMap hm;
 	//test on invalid key, value
@@ -137,6 +144,7 @@ int main() {
 	test_isToken();
 	test_validHeaderValue();
 	test_capitalize();
+	test_lowercase();
 	test_insert();
 	test_find();
 	test_erase();
