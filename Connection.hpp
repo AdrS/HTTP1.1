@@ -23,7 +23,7 @@ class NoData : ReadError {};
 
 class WriteError : ConnectionError {};
 
-const size_t BUF_SIZE = 10;
+const size_t BUF_SIZE = 1024;
 class Connection {
 	int fd;
 	char readBuf[BUF_SIZE];
