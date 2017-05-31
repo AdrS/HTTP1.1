@@ -104,6 +104,7 @@ void TlsConnection::setupConnection(const char* host, int port) {
 	ensure(ssl);
 
 	//enable hostname verification
+	//TODO: does this use Common Name or Subject alternative name?
 	X509_VERIFY_PARAM *vpm = SSL_get0_param(ssl);
 	//For list of verification flags see: X509_VERIFY_PARAM_set_hostflags
 	//TODO: figure out what these mean:

@@ -8,7 +8,7 @@ using namespace std;
 int main(const int argc, const char **argv) {
 	if(argc != 4) {
 		cout << "Usage: " << argv[0] << " host target output" << endl;
-		cout << "\tExample: ./get www.google.com / index.html" << endl;
+		cout << "\tExample: ./get https://www.google.com / index.html" << endl;
 		return 0;
 	}
 	cout << "Connection to host " << argv[1] << "..." << endl;

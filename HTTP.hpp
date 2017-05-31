@@ -78,11 +78,11 @@ class Client {
 	static const size_t BUF_SIZE = 8096;
 	char buf[BUF_SIZE];
 
-	//TODO: keep track of wheter connection is TLS
 	std::string host;
 	int port;
-	BufferedConnection con;
+	BufferedConnection *con;
 	bool keepAlive;
+	bool tls;
 
 	//implement these later
 	Client(const Client&);
@@ -92,6 +92,8 @@ class Client {
 	//WARNING: when sending OPTIONS * HTTP/1.1\r\n, SET ENCODE TO FALSE
 	size_t sendRequestLine(const std::string& method,
 		const std::string& target, bool encode = true);
+	void setupConnection(const std::string& host, int port = -1);
+	void close();
 public:
 	//read status line and returns status code
 	int parseStatusLine();
@@ -104,8 +106,10 @@ public:
 	ChunkPair parseBody(const HeaderMap& replyHeaders);
 
 	HeaderMap headers;
-	//create TCP connection to host:port
-	Client(const std::string& host, int port = 80);
+	//create connection to host:port
+	//if host starts with https:// TLS connection is created
+	//if port == -1 the default port (80 for http or 443 for https) is used
+	Client(const std::string& host, int port = -1);
 	//No need for custom destructor (yet)
 	//~Client();
 	//close connection
@@ -113,7 +117,7 @@ public:
 	//closes and reopens connection
 	void reconnect();
 	//closes existing connection and connects to new host
-	void reconnect(const std::string& host, int port = 80);
+	void reconnect(const std::string& host, int port = -1);
 
 	//all the methods
 	Reply get(const std::string& target);

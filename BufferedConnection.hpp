@@ -5,7 +5,7 @@
 #include <cstddef>
 #include "BaseConnection.hpp"
 
-const size_t BUF_SIZE = 10;
+const size_t BUF_SIZE = 1024;
 
 class BufferedConnection {
 public:

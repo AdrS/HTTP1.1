@@ -258,22 +258,58 @@ Reply::Reply(Reply&& r) {
 }
 
 ////////////////////CLIENT CODE//////////////////////
-Client::Client(const std::string& host, int port) : host(host),
-	port(port), con(host.c_str(), port), keepAlive(true) { }
+
+void Client::setupConnection(const std::string& host, int port) {
+	//check for https
+	if(strncmp("https://", host.c_str(), strlen("https://")) == 0) {
+		tls = true;
+		this->host = host.c_str() + strlen("https://");
+	} else if(strncmp("http://", host.c_str(), strlen("http://")) == 0) {
+		tls = false;
+		this->host = host.c_str() + strlen("https://");
+	} else {
+		//default to http
+		tls = false;
+		this->host = host;
+	}
+	//handle port defaults
+	if(port == -1) {
+		if(tls) {
+			port = 443;
+		} else {
+			port = 80;
+		}
+	}
+	this->port = port;
+
+	assert(!con);
+	con = new BufferedConnection(this->host.c_str(), port, tls);
+}
+
+void Client::close() {
+	if(con) {
+		delete con;
+		con = nullptr;
+	}
+}
+
+Client::Client(const std::string& host, int port) : con(nullptr), keepAlive(true) {
+	setupConnection(host, port);
+}
 //keep alive is true by default for HTTP/1.1 (not HTTP/1.0)
 
 void Client::disconnect() {
-	con.close();
+	close();
 }
 
 void Client::reconnect() {
-	con.connect(host.c_str(), port);
+	close();
+	con = new BufferedConnection(this->host.c_str(), port, tls);
 }
 
 void Client::reconnect(const std::string& host, int port) {
-	this->host = host;
-	this->port = port;
-	con.connect(this->host.c_str(), port);
+	close();
+	setupConnection(host, port);
 }
 
 //WARNING: when sending OPTIONS * HTTP/1.1\r\n, DO NOT URL ENCODE TARGET
@@ -282,8 +318,8 @@ size_t Client::sendRequestLine(const string& method, const string& target, bool 
 	//request-line   = method SP request-target SP HTTP-version CRLF
 	size_t totalLen = 0;
 
-	totalLen += con.send(method.c_str(), method.length());
-	con.sendChar(' ');
+	totalLen += con->send(method.c_str(), method.length());
+	con->sendChar(' ');
 
 	//handle percent encoding
 	if(encode) {
@@ -291,11 +327,11 @@ size_t Client::sendRequestLine(const string& method, const string& target, bool 
 		unique_ptr<char[]> peTarget(new char[peLen]);
 		peLen = percentEncode(target.c_str(), peTarget.get(), target.length(), peLen);
 
-		totalLen += con.send(peTarget.get(), peLen);
+		totalLen += con->send(peTarget.get(), peLen);
 	} else {
-		totalLen += con.send(target.c_str(), target.length());
+		totalLen += con->send(target.c_str(), target.length());
 	}
-	con.sendLine(" HTTP/1.1\r\n", false);
+	con->sendLine(" HTTP/1.1\r\n", false);
 	return totalLen + 12;
 }
 
@@ -307,7 +343,7 @@ int Client::parseStatusLine() {
 
 //read status line and returns status code and reasonPhrase
 int Client::parseStatusLine(std::string& reasonPhrase) {
-	size_t len = con.readLine(buf, BUF_SIZE);
+	size_t len = con->readLine(buf, BUF_SIZE);
 	//check that an actual line was read
 	if(len == 0 || buf[len - 1] != '\n') throw HTTPError(400);
 	len = normalizeLineEnding(buf, len);
@@ -361,7 +397,7 @@ ChunkPair Client::parseBody(const HeaderMap& replyHeaders) {
 
 		//NOTE: I only plan to support chunked and identity
 		//if chunked is the last encoding => then use chunked encoding to determine length
-		if(transferCoding == "chunked") return parseChunked(con, buf, BUF_SIZE);
+		if(transferCoding == "chunked") return parseChunked(*con, buf, BUF_SIZE);
 		//not chunked or identity => unrecognized
 		if(transferCoding != "identity") throw HTTPError(500);
 		//transfer coding = identity => read til server closes (handled below)
@@ -378,7 +414,7 @@ ChunkPair Client::parseBody(const HeaderMap& replyHeaders) {
 
 		//read up to content length bytes
 		unique_ptr<char[]> body(new char[contentLen]);
-		size_t readLen = con.recv(body.get(), contentLen);
+		size_t readLen = con->recv(body.get(), contentLen);
 
 		//if body is shorter than expected
 		if(readLen != contentLen) {
@@ -395,7 +431,7 @@ ChunkPair Client::parseBody(const HeaderMap& replyHeaders) {
 		char *part = new char[BUF_SIZE];
 		try {
 			//read another block
-			partLen = con.recv(part, BUF_SIZE);
+			partLen = con->recv(part, BUF_SIZE);
 			parts.push_back(make_pair(unique_ptr<char[]>(part), partLen));
 		} catch(...) {
 			delete[] part;
@@ -410,13 +446,13 @@ ChunkPair Client::parseBody(const HeaderMap& replyHeaders) {
 //all the methods
 Reply Client::get(const std::string& target) {
 	sendRequestLine("GET", target);
-	sendHeader(con, "Host", host); //send host header first
+	sendHeader(*con, "Host", host); //send host header first
 	//TODO: if not keepAlive, send connection close header
-	sendHeaders(con, headers); //send rest of headers TODO: make sure host is not one)
-	con.flush();
+	sendHeaders(*con, headers); //send rest of headers TODO: make sure host is not one)
+	con->flush();
 	
 	int status = parseStatusLine();
-	HeaderMap replyHeaders = parseHeaders(con, buf, BUF_SIZE);
+	HeaderMap replyHeaders = parseHeaders(*con, buf, BUF_SIZE);
 
 	if(status < 200 || status == 204 || status == 304) {
 		//then no body (regardless of headers)
@@ -428,25 +464,25 @@ Reply Client::get(const std::string& target) {
 
 Reply Client::head(const std::string& target) {
 	sendRequestLine("HEAD", target);
-	sendHeader(con, "Host", host);
-	sendHeaders(con, headers);
-	con.flush();
+	sendHeader(*con, "Host", host);
+	sendHeaders(*con, headers);
+	con->flush();
 	
 	int status = parseStatusLine();
 	//there never will be a body for head request
-	return Reply(status, parseHeaders(con, buf, BUF_SIZE));
+	return Reply(status, parseHeaders(*con, buf, BUF_SIZE));
 }
 
 Reply Client::post(const std::string& target, const char *body, size_t length) {
 	sendRequestLine("POST", target);
-	sendHeader(con, "Host", host);
-	sendHeader(con, "Content-Length", to_string(length));
-	sendHeaders(con, headers);	//TODO: make sure this does not have host or Content-Length
-	con.send(body, length);
-	con.flush();
+	sendHeader(*con, "Host", host);
+	sendHeader(*con, "Content-Length", to_string(length));
+	sendHeaders(*con, headers);	//TODO: make sure this does not have host or Content-Length
+	con->send(body, length);
+	con->flush();
 	
 	int status = parseStatusLine();
-	HeaderMap replyHeaders = parseHeaders(con, buf, BUF_SIZE);
+	HeaderMap replyHeaders = parseHeaders(*con, buf, BUF_SIZE);
 
 	if(status < 200 || status == 204 || status == 304) {
 		//then no body (regardless of headers)
