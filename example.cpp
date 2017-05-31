@@ -14,6 +14,7 @@ int main(const int argc, const char **argv) {
 	cout << "Connection to host " << argv[1] << "..." << endl;
 	Client c(argv[1]);
 	c.headers.insert("User-Agent", "Adrian's HTTP client");
+	c.headers.insert("Connection", "close");
 
 	cout << "Fetching page " << argv[2] << "..." << endl;
 	Reply r = c.get(argv[2]);

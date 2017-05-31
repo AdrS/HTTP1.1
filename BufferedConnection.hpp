@@ -28,7 +28,7 @@ public:
 	//read up to n bytes into buf and returns the number of bytes read
 	size_t recv(char *buf, size_t n);
 	//sends first n bytes in buffer
-	void send(const char *buf, size_t n);
+	size_t send(const char *buf, size_t n);
 	//closes the underlying connection
 	void close();
 private:

@@ -2,13 +2,13 @@ CXX = g++
 CXXFLAGS = -Wall -Werror -pedantic -std=c++11 -g
 #CXXFLAGS = -Wall -Werror -pedantic -std=c++11 -g -lssl -lcrypto
 
-all: TestHTTP TestHeaderMap TestURL TestConnection TestTcpConnection TestTlsConnection TestBufferedConnection
+all: TestHeaderMap TestURL TestConnection TestTcpConnection TestTlsConnection TestBufferedConnection
 
-TestHTTP: TestHTTP.o HTTP.o Connection.o HeaderMap.o URL.o
-	$(CXX) $(CXXFLAGS) TestHTTP.o HTTP.o Connection.o HeaderMap.o URL.o -o TestHTTP
+#TestHTTP: TestHTTP.o HTTP.o Connection.o HeaderMap.o URL.o
+#	$(CXX) $(CXXFLAGS) TestHTTP.o HTTP.o Connection.o HeaderMap.o URL.o -o TestHTTP
 
-TestHTTP.o: TestHTTP.cpp HTTP.hpp HeaderMap.hpp
-	$(CXX) $(CXXFLAGS) -c TestHTTP.cpp
+#TestHTTP.o: TestHTTP.cpp HTTP.hpp HeaderMap.hpp
+#	$(CXX) $(CXXFLAGS) -c TestHTTP.cpp
 
 HTTP.o: HTTP.cpp HTTP.hpp Connection.hpp URL.hpp
 	$(CXX) $(CXXFLAGS) -c HTTP.cpp
@@ -69,9 +69,15 @@ TestBufferedConnection: TestBufferedConnection.o BufferedConnection.o TlsConnect
 
 test: TestConnection TestURL TestHTTP TestHeaderMap
 	./TestHeaderMap
-	./TestHTTP
+	#./TestHTTP
 	./TestURL
 	./TestConnection
+
+example.o: example.cpp HTTP.hpp
+	$(CXX) $(CXXFLAGS) -c example.cpp
+
+demo: example.o BufferedConnection.o HTTP.o TcpConnection.o TlsConnection.o URL.o HeaderMap.o
+	$(CXX) $(CXXFLAGS) example.o HTTP.o URL.o HeaderMap.o BufferedConnection.o TlsConnection.o TcpConnection.o -lssl -lcrypto -o example
 
 clean:
 	rm -rf *.o TestHTTP TestHeaderMap TestURL TestConnection TestTcpConnection TestTlsConnection TestBufferedConnection

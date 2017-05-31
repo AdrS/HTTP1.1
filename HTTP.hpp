@@ -9,7 +9,7 @@
 #include <memory>
 #include <string>
 #include <utility>
-#include "Connection.hpp"
+#include "BufferedConnection.hpp"
 #include "HeaderMap.hpp"
 #include "URL.hpp"
 
@@ -25,20 +25,20 @@ public:
 size_t normalizeLineEnding(char *line, size_t len);
 
 //sends a single header (DOES NOT VALIDATE parameters)
-size_t sendHeader(Connection& c, const std::string& name, const std::string& value);
+size_t sendHeader(BufferedConnection& c, const std::string& name, const std::string& value);
 
 //send headers across connection followed by final empty line (CRLF)
-size_t sendHeaders(Connection& c, const HeaderMap& headers);
+size_t sendHeaders(BufferedConnection& c, const HeaderMap& headers);
 
 //reads headers starting after the start line until there is an empty line
 //NOTE: this treats LF and CRLF as both being empty lines
 //this takes a pointer to the buffer to use for storing lines
-HeaderMap parseHeaders(Connection& c, char *buf, size_t BUF_SIZE);
+HeaderMap parseHeaders(BufferedConnection& c, char *buf, size_t BUF_SIZE);
 
 //sends data as chunks and if given trailers sends those too
 //returns total length of data sent
 //NOTE: only send trailers if client says they support them
-size_t sendChunked(Connection& c, const char *buf, size_t len,
+size_t sendChunked(BufferedConnection& c, const char *buf, size_t len,
 	const HeaderMap *trailers = nullptr, size_t chunkSize = 1024);
 
 //for internal use (make private after testing)
@@ -47,7 +47,7 @@ int parseChunkLen(const char *line);
 typedef std::pair<std::unique_ptr<char[]>, size_t> ChunkPair;
 //takes connection and a buffer to read lines into
 //returns pointer to decoded chunked body + size of body
-ChunkPair parseChunked(Connection& c, char *buf, size_t BUF_SIZE);
+ChunkPair parseChunked(BufferedConnection& c, char *buf, size_t BUF_SIZE);
 
 //merges chunks together
 ChunkPair mergeChunks(const std::list<ChunkPair>& chunks);
@@ -78,9 +78,10 @@ class Client {
 	static const size_t BUF_SIZE = 8096;
 	char buf[BUF_SIZE];
 
+	//TODO: keep track of wheter connection is TLS
 	std::string host;
 	int port;
-	Connection con;
+	BufferedConnection con;
 	bool keepAlive;
 
 	//implement these later
@@ -124,6 +125,7 @@ public:
 	Reply options();
 };
 
+/*
 //holds server state associated with a connection
 class ClientConnection {
 	static const size_t BUF_SIZE = 8096;
@@ -145,6 +147,7 @@ public:
 	//reuse object for new client connection
 	void reuse(int fd);
 };
+*/
 
 
 extern const char *INFO[];

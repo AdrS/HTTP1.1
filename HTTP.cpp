@@ -61,7 +61,7 @@ const char *SERVER_ERROR[] = {
 };
 
 const size_t Client::BUF_SIZE;
-const size_t ClientConnection::BUF_SIZE;
+//const size_t ClientConnection::BUF_SIZE;
 
 //NOTE: this assumes line ends with '\n' and might fail if this is not the case
 size_t normalizeLineEnding(char *line, size_t len) {
@@ -75,7 +75,7 @@ size_t normalizeLineEnding(char *line, size_t len) {
 
 //A sender MUST NOT generate multiple header fields with the same field name
 //A recipient MAY combine multiple header fields with the same field name
-HeaderMap parseHeaders(Connection& c, char *buf, size_t BUF_SIZE) {
+HeaderMap parseHeaders(BufferedConnection& c, char *buf, size_t BUF_SIZE) {
 	HeaderMap hm;
 	
 	//while there are still headers
@@ -120,7 +120,7 @@ HeaderMap parseHeaders(Connection& c, char *buf, size_t BUF_SIZE) {
 }
 
 //sends a single header
-size_t sendHeader(Connection& c, const string& name, const string& value) {
+size_t sendHeader(BufferedConnection& c, const string& name, const string& value) {
 	size_t len = 0;
 		len += c.send(name.c_str(), name.length());
 
@@ -135,7 +135,7 @@ size_t sendHeader(Connection& c, const string& name, const string& value) {
 
 //TODO: make final CRLF optional
 //send headers across connection followed by final empty line (CRLF)
-size_t sendHeaders(Connection& c, const HeaderMap& headers) {
+size_t sendHeaders(BufferedConnection& c, const HeaderMap& headers) {
 	size_t len = 0;
 	for(auto &h : headers) {
 		len += sendHeader(c, h.first, h.second);
@@ -146,7 +146,7 @@ size_t sendHeaders(Connection& c, const HeaderMap& headers) {
 	return len + 2;
 }
 
-size_t sendChunked(Connection& c, const char *buf, size_t len,
+size_t sendChunked(BufferedConnection& c, const char *buf, size_t len,
 	const HeaderMap *trailers, size_t chunkSize) {
 	size_t total = len;
 	char lb[16];	//stores chunk length (in hex) and CRLF (16 bytes is overkill)
@@ -193,7 +193,7 @@ int parseChunkLen(const char *line) {
 
 //takes connection and a buffer to read lines into
 //returns pointer to decoded chunked body + size of body
-ChunkPair parseChunked(Connection& c, char *buf, size_t BUF_SIZE) {
+ChunkPair parseChunked(BufferedConnection& c, char *buf, size_t BUF_SIZE) {
 	size_t len;
 
 	//use unique_ptr so that if there is an exception, chunks get freed
@@ -214,7 +214,7 @@ ChunkPair parseChunked(Connection& c, char *buf, size_t BUF_SIZE) {
 		char *chunk = new char[chunkLen];
 		try {
 			//read chunk
-			if(c.read(chunk, chunkLen) != (size_t)chunkLen) {
+			if(c.recv(chunk, chunkLen) != (size_t)chunkLen) {
 				//handle case where we don't get full chunks worth
 				//TODO: clean this part up
 				throw std::exception();
@@ -374,11 +374,11 @@ ChunkPair Client::parseBody(const HeaderMap& replyHeaders) {
 		int tmp = std::stoi(cl->second);
 		if(tmp < 0) throw HTTPError(500);
 		//TODO: if multiple content lengths => must close connection
-		size_t contentLen= (size_t)tmp;
+		size_t contentLen = (size_t)tmp;
 
 		//read up to content length bytes
 		unique_ptr<char[]> body(new char[contentLen]);
-		size_t readLen = con.read(body.get(), contentLen);
+		size_t readLen = con.recv(body.get(), contentLen);
 
 		//if body is shorter than expected
 		if(readLen != contentLen) {
@@ -395,7 +395,7 @@ ChunkPair Client::parseBody(const HeaderMap& replyHeaders) {
 		char *part = new char[BUF_SIZE];
 		try {
 			//read another block
-			partLen = con.read(part, BUF_SIZE);
+			partLen = con.recv(part, BUF_SIZE);
 			parts.push_back(make_pair(unique_ptr<char[]>(part), partLen));
 		} catch(...) {
 			delete[] part;
@@ -411,6 +411,7 @@ ChunkPair Client::parseBody(const HeaderMap& replyHeaders) {
 Reply Client::get(const std::string& target) {
 	sendRequestLine("GET", target);
 	sendHeader(con, "Host", host); //send host header first
+	//TODO: if not keepAlive, send connection close header
 	sendHeaders(con, headers); //send rest of headers TODO: make sure host is not one)
 	con.flush();
 	
@@ -467,6 +468,7 @@ Reply Client::options() {
 }
 
 ////////////////////SERVER CODE//////////////////////
+/*
 ClientConnection::ClientConnection(int fd) : con(fd), keepAlive(true) {}
 
 //close connection with client
@@ -491,7 +493,7 @@ void ClientConnection::sendStatusLine(int status, const char* reason) {
 	con.send(buf, 13);
 	con.sendLine(reason, true, true);
 }
-
+*/
 const char *reasonPhrase(int status) {
 	size_t es = sizeof(INFO[0]);
 	if(status < 100) return nullptr;
@@ -520,6 +522,7 @@ const char *reasonPhrase(int status) {
 	return nullptr;
 }
 
+/*
 //same as above, except default reason phrases are used
 void ClientConnection::sendStatusLine(int status) {
 	sendStatusLine(status, reasonPhrase(status));
@@ -553,3 +556,4 @@ void ClientConnection::parseRequestLine(string& method, string& target) {
 	if(strcmp("HTTP/1.1\n", pos)) throw HTTPError(400);
 	//TODO: should use 505 Version Not Supported
 }
+*/

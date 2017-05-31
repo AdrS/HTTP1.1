@@ -128,14 +128,14 @@ void BufferedConnection::sendChar(char c) {
 	--wleft;
 }
 
-void BufferedConnection::send(const char *buf, size_t n) {
+size_t BufferedConnection::send(const char *buf, size_t n) {
 	//if buffer has enough space for all the data
 	if(n <= wleft) {
 		memcpy(wpos, buf, n);
 		wpos += n;
 		wleft -= n;
 		//TODO: should I check if buffer is full, so I can flush?
-		return;
+		return n;
 	}
 
 	//fill up reminder of internal buffer and send it off
@@ -157,6 +157,7 @@ void BufferedConnection::send(const char *buf, size_t n) {
 	memcpy(writeBuf, buf, n);
 	wpos = writeBuf + n;
 	wleft -= n;
+	return n;
 }
 
 void BufferedConnection::sendLine(const char* line, bool addNewline, bool crlf) {
