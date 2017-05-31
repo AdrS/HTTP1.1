@@ -3,7 +3,7 @@
 
 #include "BaseConnection.hpp"
 
-class TcpConnection : BaseConnection {
+class TcpConnection : public BaseConnection {
 public:
 	TcpConnection(const char* host, int port);
 	virtual ~TcpConnection();

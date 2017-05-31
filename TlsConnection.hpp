@@ -6,7 +6,7 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
-class TlsConnection {
+class TlsConnection : public BaseConnection {
 public:
 	TlsConnection(const char* host, int port);
 	virtual ~TlsConnection();
@@ -29,7 +29,7 @@ private:
 	void ensure(bool cond);
 
 	static bool openssl_loaded;
-	static const SSL_METHOD *method;
+	const static SSL_METHOD *method;
 
 	SSL_CTX *ctx;
 	SSL *ssl;

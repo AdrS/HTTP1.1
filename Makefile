@@ -2,7 +2,7 @@ CXX = g++
 CXXFLAGS = -Wall -Werror -pedantic -std=c++11 -g
 #CXXFLAGS = -Wall -Werror -pedantic -std=c++11 -g -lssl -lcrypto
 
-all: TestHTTP TestHeaderMap TestURL TestConnection TestTcpConnection TestTlsConnection
+all: TestHTTP TestHeaderMap TestURL TestConnection TestTcpConnection TestTlsConnection TestBufferedConnection
 
 TestHTTP: TestHTTP.o HTTP.o Connection.o HeaderMap.o URL.o
 	$(CXX) $(CXXFLAGS) TestHTTP.o HTTP.o Connection.o HeaderMap.o URL.o -o TestHTTP
@@ -58,6 +58,15 @@ TestTlsConnection.o: TestTlsConnection.cpp TlsConnection.hpp BaseConnection.hpp
 TestTlsConnection: TestTlsConnection.o TlsConnection.o
 	$(CXX) $(CXXFLAGS) TestTlsConnection.o TlsConnection.o -lssl -lcrypto -o TestTlsConnection
 
+BufferedConnection.o: BufferedConnection.cpp BufferedConnection.hpp BaseConnection.hpp TlsConnection.hpp TcpConnection.hpp
+	$(CXX) $(CXXFLAGS) -c BufferedConnection.cpp
+
+TestBufferedConnection.o: TestBufferedConnection.cpp BufferedConnection.hpp
+	$(CXX) $(CXXFLAGS) -c TestBufferedConnection.cpp
+
+TestBufferedConnection: TestBufferedConnection.o BufferedConnection.o TlsConnection.o TcpConnection.o
+	$(CXX) $(CXXFLAGS) TestBufferedConnection.o BufferedConnection.o TlsConnection.o TcpConnection.o -lssl -lcrypto -o TestBufferedConnection
+
 test: TestConnection TestURL TestHTTP TestHeaderMap
 	./TestHeaderMap
 	./TestHTTP
@@ -65,4 +74,4 @@ test: TestConnection TestURL TestHTTP TestHeaderMap
 	./TestConnection
 
 clean:
-	rm -rf *.o TestHTTP TestHeaderMap TestURL TestConnection TestTcpConnection TestTlsConnection
+	rm -rf *.o TestHTTP TestHeaderMap TestURL TestConnection TestTcpConnection TestTlsConnection TestBufferedConnection
